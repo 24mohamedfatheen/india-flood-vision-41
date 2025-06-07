@@ -13,6 +13,7 @@ import { useReservoirFloodData } from '../hooks/useReservoirFloodData';
 import { useToast } from '../hooks/use-toast';
 import { Clock, RefreshCw, AlertTriangle, LogIn, LogOut, Database, TrendingUp, BarChart3 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
 import { useAuth } from '../context/AuthContext';
 import { Skeleton } from '../components/ui/skeleton';
 import CursorAiIndicator from '../components/CursorAiIndicator';
