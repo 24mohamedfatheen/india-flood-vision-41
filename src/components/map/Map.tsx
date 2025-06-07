@@ -1,8 +1,8 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { floodData, getFloodDataForRegion } from '../../data/floodData';
+import { useReservoirFloodData } from '../../hooks/useReservoirFloodData';
 import { useToast } from '../../hooks/use-toast';
 import MapControls from './MapControls';
 import MapMarker from './MapMarker';
@@ -21,6 +21,12 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
   const [lastUpdate, setLastUpdate] = useState<string>('');
   const selectedFloodData = getFloodDataForRegion(selectedRegion);
   const { toast } = useToast();
+  
+  // Get enhanced flood data with live reservoir information
+  const { updateFloodDataWithReservoirs } = useReservoirFloodData();
+  const enhancedFloodData = updateFloodDataWithReservoirs(floodData);
+
+  console.log('Map: Enhanced flood data:', enhancedFloodData.map(d => ({ region: d.region, riskLevel: d.riskLevel })));
 
   // Initialize map
   useEffect(() => {
@@ -92,7 +98,7 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
 
   }, [selectedRegion, mapLoaded, selectedFloodData]);
 
-  // Update flood areas on map
+  // Update flood areas on map using enhanced data
   const updateFloodAreas = () => {
     if (!map.current || !layersRef.current['floodAreas']) return;
     
@@ -100,20 +106,18 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
     const floodAreasLayer = layersRef.current['floodAreas'] as L.LayerGroup;
     floodAreasLayer.clearLayers();
     
-    // Generate flood area features - show all risk levels except low
-    const filteredFloodData = floodData.filter(data => data.riskLevel !== 'low');
-    
-    console.log('Updating flood areas for data:', filteredFloodData.map(d => ({ region: d.region, riskLevel: d.riskLevel })));
+    // Use enhanced flood data instead of original floodData
+    const filteredFloodData = enhancedFloodData.filter(data => data.riskLevel !== 'low');
     
     filteredFloodData.forEach(data => {
       const geoJsonPolygon = createFloodAreaPolygon(data);
       if (geoJsonPolygon) {
-        // Create Leaflet polygon from GeoJSON with correct colors
+        // Create Leaflet polygon from GeoJSON
         const color = 
-          data.riskLevel === 'severe' ? '#DC2626' :   // Red-600
-          data.riskLevel === 'high' ? '#EA580C' :     // Orange-600
-          data.riskLevel === 'medium' ? '#D97706' :   // Amber-600
-          '#059669';                                   // Emerald-600 (green)
+          data.riskLevel === 'severe' ? '#F44336' :
+          data.riskLevel === 'high' ? '#FF9800' :
+          data.riskLevel === 'medium' ? '#FFC107' : 
+          '#4CAF50';
         
         const polygon = L.geoJSON(geoJsonPolygon as any, {
           style: {
@@ -154,10 +158,10 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
     
     // Get color based on risk level
     const stateColor = 
-      selectedFloodData.riskLevel === 'severe' ? '#DC2626' :   // Red-600
-      selectedFloodData.riskLevel === 'high' ? '#EA580C' :     // Orange-600
-      selectedFloodData.riskLevel === 'medium' ? '#D97706' :   // Amber-600
-      '#059669';                                               // Emerald-600 (green)
+      selectedFloodData.riskLevel === 'severe' ? '#F44336' :
+      selectedFloodData.riskLevel === 'high' ? '#FF9800' :
+      selectedFloodData.riskLevel === 'medium' ? '#FFC107' : 
+      '#4CAF50';
     
     // Create circle representing state with color based on risk level
     const stateCircle = L.circle(stateCenter, {
@@ -224,36 +228,24 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
       
       <MapControls 
         map={map.current}
-        handleZoomIn={() => map.current?.zoomIn()}
-        handleZoomOut={() => map.current?.zoomOut()}
-        handleResetView={() => map.current?.setView([20.5937, 78.9629], 5, { animate: true })}
-        toggleLayerVisibility={(layerId: string) => {
-          if (!map.current || !layersRef.current[layerId]) return;
-          const layer = layersRef.current[layerId];
-          const isVisible = map.current.hasLayer(layer);
-          if (isVisible) {
-            map.current.removeLayer(layer);
-          } else {
-            map.current.addLayer(layer);
-          }
-        }}
+        handleZoomIn={handleZoomIn}
+        handleZoomOut={handleZoomOut}
+        handleResetView={handleResetView}
+        toggleLayerVisibility={toggleLayerVisibility}
       />
       
       <MapLegend />
       
-      {/* Render map markers once the map is loaded */}
-      {mapLoaded && map.current && floodData.map(data => {
-        console.log(`Rendering marker for ${data.region} with risk level: ${data.riskLevel}`);
-        return (
-          <MapMarker 
-            key={data.id}
-            data={data}
-            map={map.current!}
-            selectedRegion={selectedRegion}
-            popupRef={popupRef}
-          />
-        );
-      })}
+      {/* Render map markers with enhanced flood data */}
+      {mapLoaded && map.current && enhancedFloodData.map(data => (
+        <MapMarker 
+          key={data.id}
+          data={data}
+          map={map.current!}
+          selectedRegion={selectedRegion}
+          popupRef={popupRef}
+        />
+      ))}
     </div>
   );
 };

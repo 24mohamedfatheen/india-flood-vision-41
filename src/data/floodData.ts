@@ -161,70 +161,6 @@ const CACHE_VALIDITY_DURATION = 6 * 60 * 60 * 1000;
 // Local storage key for persisting cache
 const IMD_CACHE_KEY = 'imd_data_cache';
 
-// Define specific risk levels for cities based on your comprehensive analysis
-const cityRiskMapping: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
-  // High Risk Cities
-  'mumbai': 'high',
-  'kolkata': 'high', 
-  'chennai': 'high',
-  'guwahati': 'high',
-  'patna': 'high',
-  'dibrugarh': 'high',
-  'jorhat': 'high',
-  'kokrajhar': 'high',
-  'balasore': 'high',
-  'kochi': 'high',
-  'alappuzha': 'severe', // Extremely vulnerable to floods
-  'silchar': 'high',
-  'purnia': 'high',
-  'motihari': 'high',
-  'muzaffarpur': 'high',
-  'darbhanga': 'high',
-  
-  // Medium Risk Cities
-  'delhi': 'medium',
-  'bengaluru': 'medium',
-  'hyderabad': 'medium',
-  'ahmedabad': 'medium',
-  'surat': 'medium',
-  'pune': 'medium',
-  'nagpur': 'medium',
-  'bhubaneswar': 'medium',
-  'cuttack': 'medium',
-  'vijayawada': 'medium',
-  'rajahmundry': 'medium',
-  'guntur': 'medium',
-  'thiruvananthapuram': 'medium',
-  'thrissur': 'medium',
-  'kottayam': 'medium',
-  'nashik': 'medium',
-  'kolhapur': 'medium',
-  'vadodara': 'medium',
-  'rajkot': 'medium',
-  'amritsar': 'medium',
-  'ludhiana': 'medium',
-  'jalandhar': 'medium',
-  'roorkee': 'medium',
-  'haridwar': 'medium',
-  'dehradun': 'medium',
-  'bihar sharif': 'medium',
-  'bhagalpur': 'medium',
-  
-  // Low Risk Cities
-  'jaipur': 'low',
-  'lucknow': 'low',
-  'kanpur': 'low',
-  'indore': 'low',
-  'agra': 'low',
-  'allahabad': 'low',
-  'gorakhpur': 'low',
-  'bareilly': 'low',
-  'varanasi': 'low',
-  'gaya': 'low',
-  'shimla': 'low',
-  'srinagar': 'low'
-};
-
 // Helper function to map IMDRegionData to FloodData
 const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
   const currentYear = new Date().getFullYear();
@@ -247,8 +183,8 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
       region: item.district,
       state: item.state,
       riskLevel: item.floodRiskLevel,
-      affectedArea: item.affectedArea || 0,
-      populationAffected: item.populationAffected || 0,
+      affectedArea: 0, // Remain 0 unless directly provided in Supabase
+      populationAffected: 0, // Remain 0 unless directly provided in Supabase
       coordinates,
       timestamp: new Date().toISOString(),
       currentRainfall: derivedCurrentRainfall,
@@ -270,46 +206,6 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
     };
   });
   return mappedData;
-};
-
-// Create diverse static fallback data with specific high-risk cities
-const createDiverseStaticData = (): FloodData[] => {
-  return regions.map((r, index) => {
-    // Get risk level from comprehensive mapping
-    const riskLevel = cityRiskMapping[r.value.toLowerCase()] || 'medium';
-    
-    // Set affected area and population based on risk level
-    const riskMultipliers = {
-      'low': { area: 15, population: 8000, rainfall: 25 },
-      'medium': { area: 75, population: 45000, rainfall: 75 },
-      'high': { area: 200, population: 150000, rainfall: 120 },
-      'severe': { area: 400, population: 750000, rainfall: 180 }
-    };
-    
-    const multiplier = riskMultipliers[riskLevel];
-    const coordinates: [number, number] = [r.coordinates[0], r.coordinates[1]];
-
-    console.log(`Creating static data for ${r.label} with risk level: ${riskLevel}`);
-
-    return {
-      id: index + 1,
-      region: r.label,
-      state: r.state,
-      riskLevel,
-      affectedArea: multiplier.area,
-      populationAffected: multiplier.population,
-      coordinates,
-      timestamp: new Date().toISOString(),
-      currentRainfall: multiplier.rainfall,
-      historicalRainfallData: [],
-      predictionAccuracy: 75,
-      estimatedDamage: { 
-        crops: multiplier.area * 1000, 
-        properties: multiplier.population * 50, 
-        infrastructure: multiplier.area * 5000 
-      }
-    };
-  });
 };
 
 // Load cache from localStorage on init
@@ -374,8 +270,39 @@ export const fetchImdData = async (forceRefresh = false): Promise<FloodData[]> =
       floodData = mapIMDRegionDataToFloodData(liveImdData);
       return floodData;
     } else {
-      console.warn('Live API returned no data. Falling back to diverse static data.');
-      floodData = createDiverseStaticData();
+      console.warn('Live API returned no data. Falling back to static data.');
+      // Fallback to static data only for regions with no live data
+      const staticFallbackData = regions.map(r => {
+        const currentYear = new Date().getFullYear();
+        const historicalForRegion = staticHistoricalRainfallData[r.value.toLowerCase()];
+
+        let currentRainfallValue = 5; // Fixed minimum as specified
+        if (historicalForRegion && historicalForRegion.length > 0) {
+          const currentYearStatic = historicalForRegion.filter(d => d.year === currentYear);
+          if (currentYearStatic.length > 0) {
+            currentRainfallValue = Math.max(5, currentYearStatic.reduce((sum, item) => sum + item.rainfall, 0) / currentYearStatic.length);
+          } else {
+            currentRainfallValue = Math.max(5, historicalForRegion.reduce((sum, item) => sum + item.rainfall, 0) / historicalForRegion.length);
+          }
+        }
+
+        const coordinates: [number, number] = [r.coordinates[0], r.coordinates[1]];
+
+        return {
+          id: regions.indexOf(r) + 1,
+          region: r.label,
+          state: r.state,
+          riskLevel: 'low' as const,
+          affectedArea: 0, // No dummy data
+          populationAffected: 0, // No dummy data
+          coordinates,
+          timestamp: new Date().toISOString(),
+          currentRainfall: currentRainfallValue,
+          historicalRainfallData: [],
+          predictionAccuracy: 70,
+        };
+      });
+      floodData = staticFallbackData;
       return floodData;
     }
 
@@ -389,9 +316,25 @@ export const fetchImdData = async (forceRefresh = false): Promise<FloodData[]> =
       return floodData;
     }
 
-    // Return diverse static data if no cached data available
-    console.log('No cached data, returning diverse static data.');
-    floodData = createDiverseStaticData();
+    // Return static data if no cached data available
+    console.log('No cached data, returning static data.');
+    const staticFallbackData = regions.map(r => {
+      const coordinates: [number, number] = [r.coordinates[0], r.coordinates[1]];
+      return {
+        id: regions.indexOf(r) + 1,
+        region: r.label,
+        state: r.state,
+        riskLevel: 'low' as const,
+        affectedArea: 0,
+        populationAffected: 0,
+        coordinates,
+        timestamp: new Date().toISOString(),
+        currentRainfall: 5, // Fixed minimum
+        historicalRainfallData: [],
+        predictionAccuracy: 70,
+      };
+    });
+    floodData = staticFallbackData;
     return floodData;
   }
 };
@@ -413,40 +356,53 @@ export const getFloodDataForRegion = (region: string): FloodData | null => {
 
 // historicalRainfallData (Strictly Static)
 export const getHistoricalRainfallData = (region: string, year: number) => {
-  const regionLower = region.toLowerCase();
-  const historicalForRegion = staticHistoricalRainfallData[regionLower];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  // Base rainfall patterns for different regions (in mm)
+  const rainfallPatterns: Record<string, number[]> = {
+    'mumbai': [5, 3, 8, 15, 60, 520, 850, 650, 320, 100, 30, 10],
+    'delhi': [10, 15, 20, 10, 30, 170, 290, 230, 115, 18, 5, 4],
+    'kolkata': [12, 18, 28, 45, 150, 390, 490, 435, 280, 100, 18, 10],
+    'chennai': [22, 12, 7, 18, 35, 55, 75, 95, 115, 295, 375, 195],
+    'bangalore': [5, 8, 15, 40, 110, 85, 95, 120, 150, 180, 65, 20],
+    'hyderabad': [8, 12, 18, 25, 45, 120, 165, 140, 120, 85, 25, 10],
+    'ahmedabad': [2, 3, 5, 8, 15, 120, 220, 180, 85, 25, 5, 2],
+    'pune': [3, 5, 8, 12, 35, 150, 210, 180, 120, 55, 15, 5],
+    'surat': [3, 4, 6, 10, 18, 140, 250, 200, 95, 30, 8, 3],
+    'jaipur': [5, 8, 12, 8, 20, 85, 180, 150, 75, 15, 5, 3],
+    'lucknow': [15, 18, 22, 12, 25, 95, 220, 200, 110, 20, 8, 6],
+    'kanpur': [12, 15, 18, 10, 22, 90, 210, 190, 105, 18, 6, 5],
+    'nagpur': [8, 10, 15, 18, 35, 180, 280, 220, 140, 60, 15, 8],
+    'patna': [10, 15, 20, 15, 30, 120, 280, 250, 150, 45, 10, 6],
+    'indore': [6, 8, 12, 15, 25, 160, 320, 280, 180, 55, 12, 6],
+    'kochi': [25, 20, 35, 120, 280, 650, 600, 400, 250, 320, 180, 65],
+    'guwahati': [18, 25, 45, 120, 280, 420, 380, 320, 220, 95, 35, 20],
+    'agra': [12, 15, 18, 10, 22, 85, 200, 180, 100, 16, 6, 4],
+    'allahabad': [14, 16, 20, 12, 25, 95, 230, 210, 120, 22, 8, 6],
+    'ranchi': [15, 20, 25, 20, 40, 150, 300, 280, 180, 70, 18, 10],
+    'bhopal': [8, 10, 15, 18, 30, 140, 300, 260, 160, 50, 12, 7],
+    'visakhapatnam': [12, 8, 15, 25, 45, 95, 120, 140, 180, 220, 150, 45],
+    'vadodara': [3, 4, 6, 8, 16, 130, 240, 190, 90, 28, 6, 3],
+    'varanasi': [16, 18, 22, 14, 28, 100, 240, 220, 130, 25, 10, 8],
+    'amritsar': [25, 30, 35, 20, 25, 45, 180, 150, 75, 15, 8, 15],
+    'nashik': [5, 8, 12, 15, 40, 180, 250, 200, 130, 65, 18, 8],
+    'aurangabad': [6, 9, 14, 18, 45, 170, 240, 190, 125, 60, 16, 7]
+  };
 
-  if (!historicalForRegion || historicalForRegion.length === 0) {
-    // If region not found in staticHistoricalRainfallData, return empty array
-    return [];
-  }
-
-  // Filter for the specific year from static data
-  const yearData = historicalForRegion.filter(d => d.year === year);
-
-  if (yearData.length > 0) {
-    // If year-specific data is found, use it directly
-    return yearData.map(d => ({ month: d.month, rainfall: d.rainfall }));
-  } else {
-    // If static data exists for region but not for specific year,
-    // calculate average pattern from available static years (non-random)
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const averageMonthlyPattern: Record<string, number> = {};
-
-    // Calculate average rainfall for each month across all static years
-    months.forEach(month => {
-      const monthlyValues = historicalForRegion.filter(d => d.month === month).map(d => d.rainfall);
-      averageMonthlyPattern[month] = monthlyValues.length > 0
-        ? monthlyValues.reduce((sum, val) => sum + val, 0) / monthlyValues.length
-        : 0;
-    });
-
-    return months.map(month => ({
-      year: year,
+  const regionPattern = rainfallPatterns[region.toLowerCase()] || rainfallPatterns['mumbai'];
+  
+  return months.map((month, index) => {
+    // Add some year-to-year variation (±20%)
+    const baseRainfall = regionPattern[index];
+    const variation = (Math.sin(year * 0.1 + index) * 0.2 + Math.random() * 0.2 - 0.1);
+    const rainfall = Math.max(0, baseRainfall * (1 + variation));
+    
+    return {
       month,
-      rainfall: Math.floor(averageMonthlyPattern[month] || 0)
-    }));
-  }
+      rainfall: Math.round(rainfall * 10) / 10, // Round to 1 decimal
+      year
+    };
+  });
 };
 
 export const getPredictionData = (region: string) => {

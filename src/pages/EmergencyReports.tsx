@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import Header from '@/components/Header';
@@ -7,97 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertTriangle, FileText } from 'lucide-react';
-
-// Mock data for emergency reports
-const mockEmergencyReports = [
-  {
-    id: '1',
-    name: 'Rajesh Kumar',
-    contactNumber: '+91 9876543210',
-    location: 'Near Krishna Temple, Ghati Village',
-    numPeople: '4',
-    hasDisabled: true,
-    hasMedicalNeeds: true,
-    medicalDetails: 'Elderly person with diabetes needs medication',
-    hasWaterFood: false,
-    waterFoodDuration: '',
-    situationDescription: 'Water level is rising, first floor already flooded. We are on the second floor.',
-    urgencyLevel: 'high',
-    timestamp: '2025-05-11T15:30:00',
-    status: 'pending'
-  },
-  {
-    id: '2',
-    name: 'Priya Singh',
-    contactNumber: '+91 8765432109',
-    location: 'Green Park Apartments, Block C, Flat 302',
-    numPeople: '2',
-    hasDisabled: false,
-    hasMedicalNeeds: false,
-    medicalDetails: '',
-    hasWaterFood: true,
-    waterFoodDuration: '2 days',
-    situationDescription: 'Area is flooded but we are safe at the moment. Roads are blocked.',
-    urgencyLevel: 'medium',
-    timestamp: '2025-05-11T14:15:00',
-    status: 'in_progress'
-  },
-  {
-    id: '3',
-    name: 'Mohammed Ali',
-    contactNumber: '+91 7654321098',
-    location: 'Blue Hills School, Main Road',
-    numPeople: '12',
-    hasDisabled: true,
-    hasMedicalNeeds: true,
-    medicalDetails: 'One child with asthma, needs inhaler',
-    hasWaterFood: true,
-    waterFoodDuration: '1 day',
-    situationDescription: 'Group of families took shelter in school building. Water is entering ground floor.',
-    urgencyLevel: 'high',
-    timestamp: '2025-05-11T12:45:00',
-    status: 'pending'
-  },
-  {
-    id: '4',
-    name: 'Anita Sharma',
-    contactNumber: '+91 6543210987',
-    location: 'River View Colony, House 45',
-    numPeople: '3',
-    hasDisabled: false,
-    hasMedicalNeeds: false,
-    medicalDetails: '',
-    hasWaterFood: false,
-    waterFoodDuration: '',
-    situationDescription: 'Water is nearly at our doorstep, may need evacuation soon.',
-    urgencyLevel: 'medium',
-    timestamp: '2025-05-11T11:20:00',
-    status: 'resolved'
-  },
-  {
-    id: '5',
-    name: 'Suresh Patel',
-    contactNumber: '+91 5432109876',
-    location: 'Old Market Area, Behind Temple',
-    numPeople: '6',
-    hasDisabled: true,
-    hasMedicalNeeds: false,
-    medicalDetails: '',
-    hasWaterFood: true,
-    waterFoodDuration: '3 days',
-    situationDescription: 'Entire family on terrace, water level rising rapidly in the area.',
-    urgencyLevel: 'high',
-    timestamp: '2025-05-11T10:05:00',
-    status: 'in_progress'
-  }
-];
+import { AlertTriangle, FileText, RefreshCw } from 'lucide-react';
+import { getEmergencyReports, updateReportStatus, EmergencyReport } from '@/services/emergencyReportsService';
+import { useToast } from '@/hooks/use-toast';
 
 const EmergencyReports = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [selectedReport, setSelectedReport] = useState(null);
+  const { toast } = useToast();
+  const [selectedReport, setSelectedReport] = useState<EmergencyReport | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [reports, setReports] = useState<EmergencyReport[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Redirect to login if not authenticated as admin
   React.useEffect(() => {
@@ -106,22 +27,58 @@ const EmergencyReports = () => {
     }
   }, [user, navigate]);
 
+  const loadReports = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getEmergencyReports();
+      setReports(data);
+    } catch (error) {
+      console.error('Error loading reports:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load emergency reports",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReports();
+    // Set up polling for new reports every 30 seconds
+    const interval = setInterval(loadReports, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   if (!user || user.userType !== 'admin') {
-    return null; // Don't render anything while redirecting
+    return null;
   }
 
-  const handleViewReport = (report) => {
+  const handleViewReport = (report: EmergencyReport) => {
     setSelectedReport(report);
     setIsDialogOpen(true);
   };
 
-  const handleUpdateStatus = (reportId, newStatus) => {
-    console.log(`Updating report ${reportId} status to ${newStatus}`);
-    // In a real application, this would update the status in the database
-    // For now, we'll just log it
+  const handleUpdateStatus = async (reportId: string, newStatus: EmergencyReport['status']) => {
+    try {
+      await updateReportStatus(reportId, newStatus);
+      await loadReports(); // Refresh the list
+      toast({
+        title: "Status Updated",
+        description: `Report status changed to ${newStatus}`,
+      });
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update report status",
+        variant: "destructive"
+      });
+    }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
         return <Badge variant="destructive">Pending</Badge>;
@@ -134,7 +91,7 @@ const EmergencyReports = () => {
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-IN', {
       day: 'numeric',
       month: 'short',
@@ -152,9 +109,13 @@ const EmergencyReports = () => {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Emergency Reports</h1>
-            <p className="text-muted-foreground">View and manage emergency assistance requests from citizens</p>
+            <p className="text-muted-foreground">Live emergency assistance requests from citizens</p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={loadReports} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              {isLoading ? 'Loading...' : 'Refresh'}
+            </Button>
             <Button variant="outline" onClick={() => navigate('/admin')}>Back to Dashboard</Button>
             <Button variant="outline" onClick={logout}>Logout</Button>
           </div>
@@ -163,52 +124,58 @@ const EmergencyReports = () => {
         <div className="bg-white rounded-lg shadow">
           <div className="p-4 border-b flex items-center gap-2">
             <FileText className="h-5 w-5 text-red-600" />
-            <h2 className="text-lg font-medium">Emergency Assistance Reports</h2>
+            <h2 className="text-lg font-medium">Live Emergency Reports ({reports.length})</h2>
           </div>
           
           <div className="p-4">
-            <Table>
-              <TableCaption>Emergency reports requiring attention</TableCaption>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>People</TableHead>
-                  <TableHead>Urgency</TableHead>
-                  <TableHead>Reported</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockEmergencyReports.map((report) => (
-                  <TableRow key={report.id}>
-                    <TableCell className="font-mono">{report.id}</TableCell>
-                    <TableCell>{report.name}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{report.location}</TableCell>
-                    <TableCell>{report.numPeople}</TableCell>
-                    <TableCell>
-                      {report.urgencyLevel === 'high' ? (
-                        <div className="flex items-center gap-1 text-red-600">
-                          <AlertTriangle className="h-4 w-4" />
-                          <span>High</span>
-                        </div>
-                      ) : report.urgencyLevel === 'medium' ? (
-                        <span className="text-yellow-600">Medium</span>
-                      ) : (
-                        <span>Low</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{formatDate(report.timestamp)}</TableCell>
-                    <TableCell>{getStatusBadge(report.status)}</TableCell>
-                    <TableCell>
-                      <Button size="sm" onClick={() => handleViewReport(report)}>View Details</Button>
-                    </TableCell>
+            {reports.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {isLoading ? 'Loading reports...' : 'No emergency reports at this time'}
+              </div>
+            ) : (
+              <Table>
+                <TableCaption>Emergency reports requiring attention</TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>People</TableHead>
+                    <TableHead>Urgency</TableHead>
+                    <TableHead>Reported</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {reports.map((report) => (
+                    <TableRow key={report.id}>
+                      <TableCell className="font-mono">{report.id}</TableCell>
+                      <TableCell>{report.name}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{report.location}</TableCell>
+                      <TableCell>{report.numPeople}</TableCell>
+                      <TableCell>
+                        {report.urgencyLevel === 'high' ? (
+                          <div className="flex items-center gap-1 text-red-600">
+                            <AlertTriangle className="h-4 w-4" />
+                            <span>High</span>
+                          </div>
+                        ) : report.urgencyLevel === 'medium' ? (
+                          <span className="text-yellow-600">Medium</span>
+                        ) : (
+                          <span>Low</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{formatDate(report.timestamp)}</TableCell>
+                      <TableCell>{getStatusBadge(report.status)}</TableCell>
+                      <TableCell>
+                        <Button size="sm" onClick={() => handleViewReport(report)}>View Details</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </div>
       </div>

@@ -1,19 +1,30 @@
 import { supabase } from '../integrations/supabase/client';
 
 export interface ReservoirData {
-  id?: number;
-  reservoir_name?: string;
-  state?: string;
-  district?: string;
-  current_level_mcm?: number;
-  capacity_mcm?: number;
-  percentage_full?: number;
-  inflow_cusecs?: number;
-  outflow_cusecs?: number;
-  last_updated?: string;
-  lat?: number;
-  long?: number;
-  full_reservoir_level?: number; // Added missing property
+  id: number;
+  reservoir_name: string;
+  state: string | null;
+  district: string | null;
+  capacity_mcm: number | null;
+  current_level_mcm: number | null;
+  inflow_cusecs: number | null;
+  outflow_cusecs: number | null;
+  percentage_full: number | null;
+  last_updated: string;
+  lat: number | null;
+  long: number | null;
+  full_reservoir_level: number | null;
+  agency_name: string | null;
+  basin: string | null;
+  date: string | null;
+  level: number | null;
+  live_capacity_frl: number | null;
+  month: string | null;
+  status: string | null;
+  storage: number | null;
+  subbasin: string | null;
+  year: number | null;
+  ingestion_timestamp: string | null;
 }
 
 export interface FloodRiskCalculation {
@@ -82,7 +93,7 @@ export const fetchReservoirData = async (): Promise<ReservoirData[]> => {
         // Now fetch more data from the working table
         const { data: fullData, error: fullError } = await supabase
           .from('indian_reservoir_levels')
-          .select('id, reservoir_name, state, district, current_level_mcm, capacity_mcm, percentage_full, inflow_cusecs, outflow_cusecs, last_updated, lat, long, full_reservoir_level')
+          .select('id, reservoir_name, state, district, current_level_mcm, capacity_mcm, percentage_full, inflow_cusecs, outflow_cusecs, last_updated, lat, long, full_reservoir_level, agency_name, basin, date, level, live_capacity_frl, month, status, storage, subbasin, year, ingestion_timestamp')
           .limit(100);
 
         if (fullError) {

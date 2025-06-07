@@ -1,65 +1,70 @@
 
 import React from 'react';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import Login from "./pages/Login";
-import AdminDashboard from "./pages/AdminDashboard";
-import EmergencyReports from "./pages/EmergencyReports";
-import SafetyTips from "./pages/SafetyTips";
-import SafetyBeforeFlood from "./pages/SafetyBeforeFlood";
-import SafetyDuringFlood from "./pages/SafetyDuringFlood";
-import SafetyAfterFlood from "./pages/SafetyAfterFlood";
-import Emergency from "./pages/Emergency";
-import EvacuationPlan from "./pages/EvacuationPlan";
-import About from "./pages/About";
-import Contact from "./pages/Contact";
-import Settings from "./pages/Settings";
-import { AuthProvider } from "./context/AuthContext";
-import RequireAuth from "./components/RequireAuth";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Index from './pages/Index';
+import Login from './pages/Login';
+import AdminDashboard from './pages/AdminDashboard';
+import EmergencyReports from './pages/EmergencyReports';
+import EvacuationPlan from './pages/EvacuationPlan';
+import { AuthProvider } from './context/AuthContext';
+import { Toaster } from '@/components/ui/toaster';
+import EmergencyReportForm from './components/EmergencyReportForm';
+import ErrorBoundary from './components/ErrorBoundary';
 
-// Create a new QueryClient instance
-const queryClient = new QueryClient();
-
-const App = () => {
+function App() {
+  console.log('App component rendering');
+  
   return (
-    <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AuthProvider>
-              <Routes>
-                <Route path="/login" element={<Login />} />
-                
-                {/* Protected routes */}
-                <Route path="/" element={<RequireAuth><Index /></RequireAuth>} />
-                <Route path="/admin" element={<RequireAuth adminOnly={true}><AdminDashboard /></RequireAuth>} />
-                <Route path="/emergency-reports" element={<RequireAuth adminOnly={true}><EmergencyReports /></RequireAuth>} />
-                <Route path="/safety" element={<RequireAuth><SafetyTips /></RequireAuth>} />
-                <Route path="/safety/before-flood" element={<RequireAuth><SafetyBeforeFlood /></RequireAuth>} />
-                <Route path="/safety/during-flood" element={<RequireAuth><SafetyDuringFlood /></RequireAuth>} />
-                <Route path="/safety/after-flood" element={<RequireAuth><SafetyAfterFlood /></RequireAuth>} />
-                <Route path="/emergency" element={<RequireAuth><Emergency /></RequireAuth>} />
-                <Route path="/evacuation-plan" element={<RequireAuth><EvacuationPlan /></RequireAuth>} />
-                <Route path="/about" element={<RequireAuth><About /></RequireAuth>} />
-                <Route path="/contact" element={<RequireAuth><Contact /></RequireAuth>} />
-                <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
-                
-                {/* Catch-all route */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </AuthProvider>
-          </BrowserRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </React.StrictMode>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ErrorBoundary>
+          <AuthProvider>
+            <div className="App">
+              <ErrorBoundary>
+                <Routes>
+                  <Route path="/" element={
+                    <ErrorBoundary>
+                      <Index />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/login" element={
+                    <ErrorBoundary>
+                      <Login />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/admin" element={
+                    <ErrorBoundary>
+                      <AdminDashboard />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/emergency-reports" element={
+                    <ErrorBoundary>
+                      <EmergencyReports />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/evacuation-plan" element={
+                    <ErrorBoundary>
+                      <EvacuationPlan />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/emergency-report" element={
+                    <ErrorBoundary>
+                      <div className="min-h-screen bg-background py-8">
+                        <div className="container mx-auto px-4">
+                          <EmergencyReportForm />
+                        </div>
+                      </div>
+                    </ErrorBoundary>
+                  } />
+                </Routes>
+              </ErrorBoundary>
+              <Toaster />
+            </div>
+          </AuthProvider>
+        </ErrorBoundary>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
-};
+}
 
 export default App;

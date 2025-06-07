@@ -7,18 +7,24 @@ const MapMarker = ({ data, map, selectedRegion, popupRef }: MapMarkerProps) => {
   useEffect(() => {
     if (!map) return;
 
-    console.log(`Creating marker for ${data.region} with risk level: ${data.riskLevel}`);
+    // Set marker color based on risk level with proper color mapping
+    const getMarkerColor = (riskLevel: string) => {
+      switch (riskLevel) {
+        case 'severe':
+          return '#DC2626'; // Red
+        case 'high':
+          return '#EA580C'; // Orange
+        case 'medium':
+          return '#D97706'; // Amber
+        case 'low':
+        default:
+          return '#16A34A'; // Green
+      }
+    };
 
-    // Set marker color based on risk level with more distinct colors
-    const color = 
-      data.riskLevel === 'severe' ? '#DC2626' :   // Red-600
-      data.riskLevel === 'high' ? '#EA580C' :     // Orange-600
-      data.riskLevel === 'medium' ? '#D97706' :   // Amber-600
-      '#059669';                                   // Emerald-600 (green)
+    const color = getMarkerColor(data.riskLevel);
     
-    console.log(`Marker color for ${data.region}: ${color} (risk: ${data.riskLevel})`);
-    
-    // Create custom marker icon with more visible styling
+    // Create custom marker icon with proper color
     const customIcon = L.divIcon({
       html: `
         <div class="flood-marker" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
@@ -121,7 +127,7 @@ const MapMarker = ({ data, map, selectedRegion, popupRef }: MapMarkerProps) => {
     };
   }, [data, map, selectedRegion, popupRef]);
 
-  return null; // This component doesn't render anything directly
+  return null;
 };
 
 export default MapMarker;
