@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Index from './pages/Index';
@@ -11,8 +12,8 @@ import EmergencyReportForm from './components/EmergencyReportForm';
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <div className="App">
           <Routes>
             <Route path="/" element={<Index />} />
@@ -30,8 +31,8 @@ function App() {
           </Routes>
           <Toaster />
         </div>
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
