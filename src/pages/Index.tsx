@@ -6,12 +6,12 @@ import RegionSelector from '../components/RegionSelector';
 import Map from '../components/Map';
 import FloodStats from '../components/FloodStats';
 import ChartSection from '../components/ChartSection';
-import PredictionCard from '../components/PredictionCard';
+import EnhancedPredictionCard from '../components/EnhancedPredictionCard';
 import HistoricalFloodData from '../components/HistoricalFloodData';
 import { getFloodDataForRegion, fetchImdData, floodData } from '../data/floodData';
 import { useReservoirFloodData } from '../hooks/useReservoirFloodData';
 import { useToast } from '../hooks/use-toast';
-import { Clock, RefreshCw, AlertTriangle, LogIn, LogOut, Database } from 'lucide-react';
+import { Clock, RefreshCw, AlertTriangle, LogIn, LogOut, Database, TrendingUp, BarChart3 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../context/AuthContext';
 import { Skeleton } from '../components/ui/skeleton';
@@ -31,7 +31,7 @@ const Index = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   
-  // Use the new reservoir flood data hook
+  // Use the reservoir flood data hook
   const { 
     isLoading: reservoirLoading, 
     error: reservoirError, 
@@ -40,12 +40,12 @@ const Index = () => {
     reservoirCount
   } = useReservoirFloodData();
 
-  // Get current region's flood data (now enhanced with live reservoir data)
+  // Get current region's flood data
   const floodDataForRegion = getFloodDataForRegion(selectedRegion);
   const enhancedFloodData = floodDataForRegion ? 
     updateFloodDataWithReservoirs([floodDataForRegion])[0] : null;
 
-  // Improved data fetching function with consistency handling
+  // Data fetching function
   const loadFloodData = useCallback(async (forceRefresh = false) => {
     const currentState = forceRefresh ? 'updating' : dataFreshness;
     setDataFreshness(currentState);
@@ -57,7 +57,6 @@ const Index = () => {
     try {
       await fetchImdData(forceRefresh);
       
-      // Update flood data with reservoir information
       const updatedFloodData = updateFloodDataWithReservoirs(floodData);
       setCurrentFloodData(updatedFloodData);
       
@@ -68,21 +67,21 @@ const Index = () => {
       
       if (forceRefresh) {
         toast({
-          title: "Data refreshed",
-          description: `Latest flood data with ${reservoirCount} reservoir conditions updated at ${now.toLocaleString()}`,
-          duration: 5000,
+          title: "🔄 Data Refreshed Successfully",
+          description: `Enhanced flood analysis with ${reservoirCount} live reservoir conditions updated`,
+          duration: 4000,
         });
       } else {
         toast({
-          title: "Data Loaded",
-          description: `Flood data with live reservoir conditions loaded at ${now.toLocaleString()}`,
-          duration: 5000,
+          title: "📊 Data Loaded",
+          description: `Comprehensive flood data with live reservoir monitoring active`,
+          duration: 3000,
         });
       }
     } catch (error) {
       console.error("Error loading data:", error);
       toast({
-        title: forceRefresh ? "Refresh Failed" : "Error Loading Data",
+        title: forceRefresh ? "❌ Refresh Failed" : "⚠️ Loading Error",
         description: "Could not fetch the latest flood and reservoir data",
         variant: "destructive",
         duration: 5000,
@@ -111,37 +110,22 @@ const Index = () => {
     setSelectedRegion(region);
   };
   
-  // Improved manual refresh handler
   const handleManualRefresh = async () => {
-    if (isRefreshing) return; // Prevent multiple concurrent refreshes
-    
-    console.log('Manual refresh triggered');
+    if (isRefreshing) return;
+    console.log('🔄 Manual refresh initiated');
     await loadFloodData(true);
   };
   
-  // Set up data refresh every 12 hours
+  // Auto-refresh setup
   useEffect(() => {
     const updateInterval = setInterval(() => {
       loadFloodData(true);
-    }, 12 * 60 * 60 * 1000); // 12 hours in milliseconds
-    
-    // For demo purposes, add a shorter interval to simulate updates
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Development mode: adding demo interval');
-      const demoInterval = setTimeout(() => {
-        loadFloodData(true);
-      }, 60000); // 1 minute for demo
-      
-      return () => {
-        clearInterval(updateInterval);
-        clearTimeout(demoInterval);
-      };
-    }
+    }, 12 * 60 * 60 * 1000);
     
     return () => clearInterval(updateInterval);
   }, [loadFloodData]);
 
-  // Check if data is stale (over 12 hours old)
+  // Data freshness check
   useEffect(() => {
     const checkFreshness = () => {
       const now = new Date();
@@ -152,45 +136,46 @@ const Index = () => {
       }
     };
     
-    // Check freshness initially
     checkFreshness();
-    
-    // Set up interval to check freshness every minute
-    const freshnessInterval = setInterval(checkFreshness, 60000); // 1 minute
+    const freshnessInterval = setInterval(checkFreshness, 60000);
     
     return () => clearInterval(freshnessInterval);
   }, [lastUpdateTime]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        {/* Enhanced Header Section */}
+        <div className="flex items-center justify-between mb-6 bg-white rounded-lg shadow-sm p-4">
           <Header />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <CursorAiIndicator />
             {isAuthenticated ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  Welcome, {user?.username}
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-sm font-medium">Welcome, {user?.username}</p>
                   {user?.userType === 'admin' && (
-                    <span className="ml-1 text-xs bg-red-100 text-red-600 px-1 py-0.5 rounded">Admin</span>
+                    <Badge className="text-xs bg-red-100 text-red-700 border-red-200">
+                      Administrator
+                    </Badge>
                   )}
-                </span>
+                </div>
                 {user?.userType === 'admin' && (
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => navigate('/admin')}
-                    className="text-xs h-7"
+                    className="bg-red-50 border-red-200 hover:bg-red-100"
                   >
-                    Admin Panel
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    Command Center
                   </Button>
                 )}
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   onClick={logout}
-                  className="text-xs h-7"
+                  className="text-gray-600"
                 >
                   <LogOut className="h-3 w-3 mr-1" />
                   Logout
@@ -201,7 +186,6 @@ const Index = () => {
                 variant="outline" 
                 size="sm" 
                 onClick={() => navigate('/login')}
-                className="text-xs h-7"
               >
                 <LogIn className="h-3 w-3 mr-1" />
                 Login
@@ -210,54 +194,55 @@ const Index = () => {
           </div>
         </div>
         
-        {/* Region Selector first */}
-        <RegionSelector 
-          selectedRegion={selectedRegion}
-          onRegionChange={handleRegionChange}
-        />
-        
-        {/* Map now placed between region selector and timestamps/refresh controls */}
+        {/* Region Selector */}
         <div className="mb-6">
-          <Map 
-            selectedRegion={selectedRegion} 
-            className="w-full"
-            aspectRatio={16/9}
+          <RegionSelector 
+            selectedRegion={selectedRegion}
+            onRegionChange={handleRegionChange}
           />
         </div>
         
-        <div className="mb-6 flex items-center justify-between flex-wrap">
-          <div className="flex items-center mt-3 sm:mt-0 space-x-2">
-            <div className={`timestamp-badge ${dataFreshness === 'stale' ? 'bg-yellow-50 text-yellow-700' : ''}`}>
-              <Clock className="h-3 w-3 mr-1" />
-              Last updated: {lastUpdateTime.toLocaleString()}
+        {/* Status Bar */}
+        <div className="mb-6 flex items-center justify-between flex-wrap gap-3 bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center flex-wrap gap-3">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
+              dataFreshness === 'stale' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+            }`}>
+              <Clock className="h-3 w-3" />
+              <span className="font-medium">
+                {dataFreshness === 'stale' ? 'Data Outdated' : 'Live Data'}: {lastUpdateTime.toLocaleString()}
+              </span>
             </div>
+            
             {reservoirCount > 0 && (
-              <div className="timestamp-badge bg-blue-50 text-blue-700">
-                <Database className="h-3 w-3 mr-1" />
-                Live: {reservoirCount} reservoirs
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm">
+                <Database className="h-3 w-3" />
+                <span className="font-medium">{reservoirCount} Reservoirs Monitored</span>
               </div>
             )}
+            
             <Button 
               variant="outline" 
               size="sm" 
               onClick={handleManualRefresh}
               disabled={dataFreshness === 'updating' || isRefreshing}
-              className="text-xs h-7"
+              className="h-8"
             >
               <RefreshCw className={`h-3 w-3 mr-1 ${(dataFreshness === 'updating' || isRefreshing) ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+              {isRefreshing ? 'Updating...' : 'Refresh'}
             </Button>
           </div>
         </div>
         
+        {/* Alert Messages */}
         {dataFreshness === 'stale' && (
-          <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-            <div className="flex items-start">
-              <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5 mr-2" />
+          <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-l-4 border-yellow-400 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
               <div>
-                <h3 className="font-medium text-yellow-800">Data may not be current</h3>
-                <p className="text-sm text-yellow-700">
-                  The flood data has not been updated in over 12 hours. The information displayed may not reflect the current situation.
+                <h3 className="font-medium text-yellow-800">Data Freshness Alert</h3>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Flood data hasn't been updated in over 12 hours. Information may not reflect current conditions.
                 </p>
               </div>
             </div>
@@ -265,75 +250,111 @@ const Index = () => {
         )}
 
         {reservoirError && (
-          <div className="mb-4 bg-orange-50 border-l-4 border-orange-400 p-4 rounded">
-            <div className="flex items-start">
-              <AlertTriangle className="h-5 w-5 text-orange-400 mt-0.5 mr-2" />
+          <div className="mb-6 bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-400 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
               <div>
-                <h3 className="font-medium text-orange-800">Live reservoir data unavailable</h3>
-                <p className="text-sm text-orange-700">
-                  Using historical flood data. Live reservoir conditions could not be loaded.
+                <h3 className="font-medium text-orange-800">Live Data Limitation</h3>
+                <p className="text-sm text-orange-700 mt-1">
+                  Live reservoir monitoring is temporarily unavailable. Using historical flood patterns.
                 </p>
               </div>
             </div>
           </div>
         )}
         
+        {/* Main Content */}
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-lg font-medium">Loading flood data...</p>
-            <p className="text-sm text-muted-foreground mt-2">Analyzing live reservoir conditions and weather data</p>
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-gray-800">Loading Comprehensive Flood Analysis</h3>
+                <p className="text-sm text-gray-600">Analyzing weather patterns, river levels, and satellite data...</p>
+                <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3" />
+                    AI Forecasting
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Database className="h-3 w-3" />
+                    Live Monitoring
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <BarChart3 className="h-3 w-3" />
+                    Risk Analysis
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
-          <>
-            {/* Updated layout: content sections */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="space-y-6">
+            {/* Map Section */}
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <Map 
+                selectedRegion={selectedRegion} 
+                className="w-full"
+                aspectRatio={16/9}
+              />
+            </div>
+            
+            {/* Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column - Main Content */}
               <div className="lg:col-span-2 space-y-6">
-                {/* Left side content */}
                 <FloodStats floodData={enhancedFloodData} />
                 <ChartSection selectedRegion={selectedRegion} />
-                <PredictionCard floodData={enhancedFloodData} />
+                <EnhancedPredictionCard floodData={enhancedFloodData} />
               </div>
               
-              {/* Right side content - additional info, no map here anymore */}
+              {/* Right Column - Info Panel */}
               <div className="lg:col-span-1">
-                <div className="sticky top-6 bg-white p-4 rounded-lg shadow">
-                  <h2 className="text-lg font-medium mb-2">Flood Risk Information</h2>
-                  
-                  {reservoirCount > 0 && (
-                    <div className="mb-4 p-2 bg-blue-50 rounded">
-                      <p className="text-xs text-blue-700 font-medium">
-                        ✓ Live Data Active
-                      </p>
-                      <p className="text-xs text-blue-600">
-                        Analyzing {reservoirCount} reservoir conditions in real-time
-                      </p>
-                      {reservoirLastUpdated && (
-                        <p className="text-xs text-blue-500 mt-1">
-                          Last sync: {reservoirLastUpdated.toLocaleTimeString()}
+                <div className="sticky top-6 space-y-4">
+                  {/* Live Status Card */}
+                  <div className="bg-white rounded-lg shadow-sm p-4">
+                    <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-blue-600" />
+                      System Status
+                    </h3>
+                    
+                    {reservoirCount > 0 && (
+                      <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium text-green-800">Live Monitoring Active</span>
+                        </div>
+                        <p className="text-xs text-green-700">
+                          Real-time analysis of {reservoirCount} reservoir systems
                         </p>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="mt-4">
-                    <h3 className="text-sm font-medium mb-2">Risk Levels</h3>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="flex items-center">
-                        <span className="w-3 h-3 bg-green-500 rounded-full mr-1"></span>
-                        <span>Low Risk</span>
+                        {reservoirLastUpdated && (
+                          <p className="text-xs text-green-600 mt-1">
+                            Last sync: {reservoirLastUpdated.toLocaleTimeString()}
+                          </p>
+                        )}
                       </div>
-                      <div className="flex items-center">
-                        <span className="w-3 h-3 bg-yellow-500 rounded-full mr-1"></span>
-                        <span>Medium Risk</span>
-                      </div>
-                      <div className="flex items-center">
-                        <span className="w-3 h-3 bg-orange-500 rounded-full mr-1"></span>
-                        <span>High Risk</span>
-                      </div>
-                      <div className="flex items-center">
-                        <span className="w-3 h-3 bg-red-500 rounded-full mr-1"></span>
-                        <span>Severe Risk</span>
+                    )}
+                    
+                    {/* Risk Level Legend */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-3 text-gray-700">Risk Level Guide</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                          <span>Low Risk (0-30%)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                          <span>Medium Risk (30-50%)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                          <span>High Risk (50-70%)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                          <span>Severe Risk (70%+)</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -341,50 +362,53 @@ const Index = () => {
               </div>
             </div>
             
-            {/* Toggle button for historical flood data section */}
-            <div className="mb-4">
+            {/* Historical Data Toggle */}
+            <div className="text-center">
               <Button 
                 variant="outline"
                 onClick={() => setShowHistoricalData(!showHistoricalData)}
-                className="w-full"
+                className="bg-white hover:bg-gray-50"
               >
-                {showHistoricalData ? "Hide Historical Data" : "Show Historical Flood Data (2015-2025)"}
+                {showHistoricalData ? "Hide" : "Show"} Historical Flood Data (2015-2025)
               </Button>
             </div>
             
-            {/* Historical Flood Data Section */}
-            {showHistoricalData && <HistoricalFloodData />}
-          </>
+            {/* Historical Data Section */}
+            {showHistoricalData && (
+              <div className="bg-white rounded-lg shadow-sm">
+                <HistoricalFloodData />
+              </div>
+            )}
+          </div>
         )}
         
-        <div className="text-center text-sm rounded-lg bg-white p-4 shadow-sm mb-6">
-          <h3 className="font-medium mb-2">Official Data Sources</h3>
-          <div className="flex flex-wrap justify-center gap-2 mb-3">
-            <a href="https://mausam.imd.gov.in/" target="_blank" rel="noopener noreferrer" className="data-source-badge bg-blue-100">
-              Weather Services
-            </a>
-            <a href="https://cwc.gov.in/" target="_blank" rel="noopener noreferrer" className="data-source-badge">
-              Water Resources
-            </a>
-            <a href="https://ndma.gov.in/" target="_blank" rel="noopener noreferrer" className="data-source-badge">
-              Disaster Management
-            </a>
-            <a href="https://chennaimetrowater.tn.gov.in/" target="_blank" rel="noopener noreferrer" className="data-source-badge">
-              Chennai Water Supply
-            </a>
-            <a href="https://cursor.ai/" target="_blank" rel="noopener noreferrer" className="data-source-badge bg-indigo-100">
-              Cursor AI
-            </a>
+        {/* Footer */}
+        <footer className="mt-12 bg-white rounded-lg shadow-sm p-6">
+          <div className="text-center space-y-4">
+            <h3 className="font-semibold text-gray-800">Official Data Sources</h3>
+            <div className="flex flex-wrap justify-center gap-3">
+              {[
+                { name: 'Weather Services', url: 'https://mausam.imd.gov.in/', color: 'bg-blue-100 text-blue-800' },
+                { name: 'Water Resources', url: 'https://cwc.gov.in/', color: 'bg-cyan-100 text-cyan-800' },
+                { name: 'Disaster Management', url: 'https://ndma.gov.in/', color: 'bg-red-100 text-red-800' },
+                { name: 'Cursor AI Technology', url: 'https://cursor.ai/', color: 'bg-purple-100 text-purple-800' }
+              ].map((source) => (
+                <a 
+                  key={source.name}
+                  href={source.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className={`px-3 py-1 rounded-full text-xs font-medium hover:shadow-sm transition-shadow ${source.color}`}
+                >
+                  {source.name}
+                </a>
+              ))}
+            </div>
+            <div className="text-xs text-gray-500 space-y-1">
+              <p>Advanced flood prediction powered by AI technology and real-time monitoring</p>
+              <p>Last updated: {lastUpdateTime.toLocaleString()} • Next update: {nextUpdateTime.toLocaleString()}</p>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            All flood predictions and warnings are based on official meteorological and hydrological data, enhanced with Cursor AI technology. Updates occur every 12 hours.
-          </p>
-        </div>
-        
-        <footer className="text-center text-sm text-muted-foreground py-4 border-t mt-6">
-          <p>India Flood Vision Dashboard - Data last updated: {lastUpdateTime.toLocaleString()}</p>
-          <p className="text-xs mt-1">Next scheduled update: {nextUpdateTime.toLocaleString()}</p>
-          <p className="text-xs mt-1">Powered by Cursor AI technology</p>
         </footer>
       </div>
     </div>
