@@ -6,12 +6,19 @@ import { floodData, getFloodDataForRegion } from '../../data/floodData';
 import { useToast } from '../../hooks/use-toast';
 import MapControls from './MapControls';
 import MapMarker from './MapMarker';
+import ReservoirMarker from './ReservoirMarker';
 import MapLegend from './MapLegend';
 import MapAttribution from './MapAttribution';
 import { createFloodAreaPolygon } from './MapUtils';
 import { MapProps } from './types';
+import { fetchReservoirsForState, fetchReservoirsForDistrict, getDistrictReservoirSummaries, ReservoirMapData, DistrictReservoirSummary } from '../../services/reservoirMapService';
 
-const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
+interface ExtendedMapProps extends MapProps {
+  selectedState?: string;
+  selectedDistrict?: string;
+}
+
+const MapComponent: React.FC<ExtendedMapProps> = ({ selectedRegion, selectedState = "", selectedDistrict = "" }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const popupRef = useRef<L.Popup | null>(null);
@@ -19,6 +26,8 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
   const layersRef = useRef<{[key: string]: L.Layer}>({});
   const [mapLoaded, setMapLoaded] = useState<boolean>(false);
   const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [reservoirMarkers, setReservoirMarkers] = useState<ReservoirMapData[]>([]);
+  const [districtSummaries, setDistrictSummaries] = useState<DistrictReservoirSummary[]>([]);
   const selectedFloodData = getFloodDataForRegion(selectedRegion);
   const { toast } = useToast();
 
@@ -53,6 +62,9 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
       // Add state boundaries layer group
       layersRef.current['stateBoundaries'] = L.layerGroup().addTo(map.current);
       
+      // Add reservoir markers layer group
+      layersRef.current['reservoirMarkers'] = L.layerGroup().addTo(map.current);
+      
       setMapLoaded(true);
       
       const now = new Date();
@@ -73,40 +85,87 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
     }
   }, [toast]);
 
-  // Update map when selected region changes
+  // Load reservoir data when state/district changes
+  useEffect(() => {
+    if (!mapLoaded || !map.current) return;
+
+    const loadReservoirData = async () => {
+      try {
+        // Clear existing reservoir markers
+        const reservoirLayer = layersRef.current['reservoirMarkers'] as L.LayerGroup;
+        if (reservoirLayer) {
+          reservoirLayer.clearLayers();
+        }
+
+        if (selectedState && selectedDistrict) {
+          // Load specific district reservoirs
+          console.log(`🎯 Loading reservoirs for ${selectedDistrict}, ${selectedState}`);
+          const reservoirs = await fetchReservoirsForDistrict(selectedState, selectedDistrict);
+          setReservoirMarkers(reservoirs);
+          
+          if (reservoirs.length > 0) {
+            // Zoom to district bounds
+            const bounds = L.latLngBounds(reservoirs.map(r => r.coordinates));
+            map.current?.fitBounds(bounds, { padding: [20, 20] });
+          }
+        } else if (selectedState) {
+          // Load state summary
+          console.log(`🗺️ Loading state summary for ${selectedState}`);
+          const summaries = await getDistrictReservoirSummaries(selectedState);
+          setDistrictSummaries(summaries);
+          
+          if (summaries.length > 0) {
+            // Zoom to state bounds
+            const bounds = L.latLngBounds(summaries.map(s => s.coordinates));
+            map.current?.fitBounds(bounds, { padding: [50, 50] });
+          }
+        } else {
+          // Default behavior - show original flood data
+          setReservoirMarkers([]);
+          setDistrictSummaries([]);
+        }
+      } catch (error) {
+        console.error('Error loading reservoir data:', error);
+        toast({
+          title: "Data Loading Error",
+          description: "Could not load reservoir data for the selected region.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    loadReservoirData();
+  }, [selectedState, selectedDistrict, mapLoaded, toast]);
+
+  // Update map when selected region changes (original flood data)
   useEffect(() => {
     if (!mapLoaded || !map.current || !selectedFloodData) return;
 
-    // Fly to the selected region with a closer zoom for smaller viewport
-    map.current.flyTo(
-      [selectedFloodData.coordinates[0], selectedFloodData.coordinates[1]],
-      7,
-      { animate: true, duration: 1 }
-    );
+    // Only zoom to flood data if no state/district is selected
+    if (!selectedState && !selectedDistrict) {
+      map.current.flyTo(
+        [selectedFloodData.coordinates[0], selectedFloodData.coordinates[1]],
+        7,
+        { animate: true, duration: 1 }
+      );
+    }
 
-    // Update the flood affected areas
     updateFloodAreas();
-
-    // Add state boundary highlighting
     updateStateBoundary();
-
-  }, [selectedRegion, mapLoaded, selectedFloodData]);
+  }, [selectedRegion, mapLoaded, selectedFloodData, selectedState, selectedDistrict]);
 
   // Update flood areas on map
   const updateFloodAreas = () => {
     if (!map.current || !layersRef.current['floodAreas']) return;
     
-    // Clear existing flood areas
     const floodAreasLayer = layersRef.current['floodAreas'] as L.LayerGroup;
     floodAreasLayer.clearLayers();
     
-    // Generate flood area features
     const filteredFloodData = floodData.filter(data => data.riskLevel !== 'low');
     
     filteredFloodData.forEach(data => {
       const geoJsonPolygon = createFloodAreaPolygon(data);
       if (geoJsonPolygon) {
-        // Create Leaflet polygon from GeoJSON
         const color = 
           data.riskLevel === 'severe' ? '#F44336' :
           data.riskLevel === 'high' ? '#FF9800' :
@@ -123,7 +182,6 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
           }
         });
         
-        // Add popup with information
         polygon.bindPopup(`
           <div class="font-bold">${data.region}, ${data.state}</div>
           <div>Risk Level: ${data.riskLevel.toUpperCase()}</div>
@@ -131,7 +189,6 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
           <div>Population: ${data.populationAffected.toLocaleString()}</div>
         `);
         
-        // Add to layer group
         polygon.addTo(floodAreasLayer);
       }
     });
@@ -141,23 +198,18 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
   const updateStateBoundary = () => {
     if (!map.current || !layersRef.current['stateBoundaries'] || !selectedFloodData) return;
     
-    // Clear existing boundaries
     const stateBoundariesLayer = layersRef.current['stateBoundaries'] as L.LayerGroup;
     stateBoundariesLayer.clearLayers();
     
-    // Create a simplified state boundary (placeholder - in a real app, you'd use GeoJSON data for state boundaries)
-    // This is a simplified circle representing the state boundary for demo purposes
     const stateCenter = selectedFloodData.coordinates;
-    const stateRadius = Math.sqrt(selectedFloodData.affectedArea) * 500; // Scale based on affected area
+    const stateRadius = Math.sqrt(selectedFloodData.affectedArea) * 500;
     
-    // Get color based on risk level
     const stateColor = 
       selectedFloodData.riskLevel === 'severe' ? '#F44336' :
       selectedFloodData.riskLevel === 'high' ? '#FF9800' :
       selectedFloodData.riskLevel === 'medium' ? '#FFC107' : 
       '#4CAF50';
     
-    // Create circle representing state with color based on risk level
     const stateCircle = L.circle(stateCenter, {
       radius: stateRadius,
       color: stateColor,
@@ -168,7 +220,6 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
       fillOpacity: 0.15,
     }).addTo(stateBoundariesLayer);
     
-    // Add state label
     const stateName = selectedFloodData.state;
     const icon = L.divIcon({
       className: 'state-label',
@@ -196,7 +247,6 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
     map.current.setView([20.5937, 78.9629], 5, { animate: true });
   };
 
-  // Toggle layer visibility
   const toggleLayerVisibility = (layerId: string) => {
     if (!map.current || !layersRef.current[layerId]) return;
     
@@ -230,14 +280,45 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
       
       <MapLegend />
       
-      {/* Render map markers once the map is loaded */}
-      {mapLoaded && map.current && floodData.map(data => (
+      {/* Render original flood markers when no state/district is selected */}
+      {mapLoaded && map.current && !selectedState && !selectedDistrict && floodData.map(data => (
         <MapMarker 
           key={data.id}
           data={data}
           map={map.current!}
           selectedRegion={selectedRegion}
           popupRef={popupRef}
+        />
+      ))}
+      
+      {/* Render reservoir markers for specific district */}
+      {mapLoaded && map.current && selectedState && selectedDistrict && reservoirMarkers.map(reservoir => (
+        <ReservoirMarker
+          key={reservoir.id}
+          reservoir={reservoir}
+          map={map.current!}
+          isSelected={false}
+        />
+      ))}
+      
+      {/* Render district summary markers for state view */}
+      {mapLoaded && map.current && selectedState && !selectedDistrict && districtSummaries.map(summary => (
+        <ReservoirMarker
+          key={`district-${summary.district}`}
+          reservoir={{
+            id: `district-${summary.district}`,
+            name: `${summary.district} (${summary.reservoirCount} reservoirs)`,
+            state: summary.state,
+            district: summary.district,
+            coordinates: summary.coordinates,
+            reservoirPercentage: summary.avgReservoirPercentage,
+            riskLevel: summary.riskLevel,
+            inflowCusecs: summary.totalInflowCusecs,
+            outflowCusecs: 0,
+            lastUpdated: new Date().toISOString()
+          }}
+          map={map.current!}
+          isSelected={false}
         />
       ))}
     </div>
