@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
@@ -13,13 +14,11 @@ import { useToast } from '../hooks/use-toast';
 import { Clock, RefreshCw, AlertTriangle, LogIn, LogOut, Database } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../context/AuthContext';
+import { Skeleton } from '../components/ui/skeleton';
 import CursorAiIndicator from '../components/CursorAiIndicator';
 
 const Index = () => {
   const [selectedRegion, setSelectedRegion] = useState('mumbai');
-  const [selectedState, setSelectedState] = useState<string>('');
-  const [selectedDistrict, setSelectedDistrict] = useState<string>('');
-  const [locationData, setLocationData] = useState<any>(null);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [nextUpdateTime, setNextUpdateTime] = useState<Date>(new Date(Date.now() + 12 * 60 * 60 * 1000));
   const [dataFreshness, setDataFreshness] = useState<'fresh' | 'stale' | 'updating'>('updating');
@@ -32,7 +31,7 @@ const Index = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   
-  // Use the reservoir flood data hook
+  // Use the new reservoir flood data hook
   const { 
     isLoading: reservoirLoading, 
     error: reservoirError, 
@@ -41,40 +40,12 @@ const Index = () => {
     reservoirCount
   } = useReservoirFloodData();
 
-  // Get current region's flood data
+  // Get current region's flood data (now enhanced with live reservoir data)
   const floodDataForRegion = getFloodDataForRegion(selectedRegion);
   const enhancedFloodData = floodDataForRegion ? 
     updateFloodDataWithReservoirs([floodDataForRegion])[0] : null;
 
-  // Handle location data from RegionSelector with reactive updates
-  const handleLocationData = useCallback((data: { coordinates: [number, number], rainfall: any }) => {
-    setLocationData(data);
-    console.log('Location data updated:', data);
-    
-    // Trigger reactive updates for dependent components
-    setDataFreshness('fresh');
-    
-    // Update the last update time to reflect new data
-    setLastUpdateTime(new Date());
-  }, []);
-
-  // Handle region change and extract state/district info
-  const handleRegionChange = useCallback((region: string) => {
-    setSelectedRegion(region);
-  }, []);
-
-  // Update state and district from RegionSelector
-  const handleRegionSelectorChange = useCallback((regionData: { 
-    selectedState: string; 
-    selectedDistrict: string; 
-    selectedRegion: string;
-  }) => {
-    setSelectedState(regionData.selectedState);
-    setSelectedDistrict(regionData.selectedDistrict);
-    setSelectedRegion(regionData.selectedRegion);
-  }, []);
-
-  // Data fetching function with error handling
+  // Improved data fetching function with consistency handling
   const loadFloodData = useCallback(async (forceRefresh = false) => {
     const currentState = forceRefresh ? 'updating' : dataFreshness;
     setDataFreshness(currentState);
@@ -86,6 +57,7 @@ const Index = () => {
     try {
       await fetchImdData(forceRefresh);
       
+      // Update flood data with reservoir information
       const updatedFloodData = updateFloodDataWithReservoirs(floodData);
       setCurrentFloodData(updatedFloodData);
       
@@ -111,7 +83,7 @@ const Index = () => {
       console.error("Error loading data:", error);
       toast({
         title: forceRefresh ? "Refresh Failed" : "Error Loading Data",
-        description: "Could not fetch the latest flood and reservoir data. Please try again.",
+        description: "Could not fetch the latest flood and reservoir data",
         variant: "destructive",
         duration: 5000,
       });
@@ -135,33 +107,30 @@ const Index = () => {
     }
   }, [reservoirLoading, updateFloodDataWithReservoirs]);
 
-  // Reactive updates when location data changes
-  useEffect(() => {
-    if (locationData) {
-      console.log('Triggering reactive updates for location data:', locationData);
-      // Force re-render of dependent components
-      setLastUpdateTime(new Date());
-    }
-  }, [locationData]);
+  const handleRegionChange = (region: string) => {
+    setSelectedRegion(region);
+  };
   
+  // Improved manual refresh handler
   const handleManualRefresh = async () => {
-    if (isRefreshing) return;
+    if (isRefreshing) return; // Prevent multiple concurrent refreshes
     
     console.log('Manual refresh triggered');
     await loadFloodData(true);
   };
   
-  // Auto-refresh setup
+  // Set up data refresh every 12 hours
   useEffect(() => {
     const updateInterval = setInterval(() => {
       loadFloodData(true);
-    }, 12 * 60 * 60 * 1000);
+    }, 12 * 60 * 60 * 1000); // 12 hours in milliseconds
     
+    // For demo purposes, add a shorter interval to simulate updates
     if (process.env.NODE_ENV === 'development') {
       console.log('Development mode: adding demo interval');
       const demoInterval = setTimeout(() => {
         loadFloodData(true);
-      }, 60000);
+      }, 60000); // 1 minute for demo
       
       return () => {
         clearInterval(updateInterval);
@@ -172,7 +141,7 @@ const Index = () => {
     return () => clearInterval(updateInterval);
   }, [loadFloodData]);
 
-  // Check data freshness
+  // Check if data is stale (over 12 hours old)
   useEffect(() => {
     const checkFreshness = () => {
       const now = new Date();
@@ -183,8 +152,11 @@ const Index = () => {
       }
     };
     
+    // Check freshness initially
     checkFreshness();
-    const freshnessInterval = setInterval(checkFreshness, 60000);
+    
+    // Set up interval to check freshness every minute
+    const freshnessInterval = setInterval(checkFreshness, 60000); // 1 minute
     
     return () => clearInterval(freshnessInterval);
   }, [lastUpdateTime]);
@@ -238,19 +210,16 @@ const Index = () => {
           </div>
         </div>
         
-        {/* Enhanced Region Selector with location data callback */}
+        {/* Region Selector first */}
         <RegionSelector 
           selectedRegion={selectedRegion}
           onRegionChange={handleRegionChange}
-          onLocationData={handleLocationData}
         />
         
-        {/* Map positioned between selector and controls */}
+        {/* Map now placed between region selector and timestamps/refresh controls */}
         <div className="mb-6">
           <Map 
-            selectedRegion={selectedRegion}
-            selectedState={selectedState}
-            selectedDistrict={selectedDistrict}
+            selectedRegion={selectedRegion} 
             className="w-full"
             aspectRatio={16/9}
           />
@@ -266,11 +235,6 @@ const Index = () => {
               <div className="timestamp-badge bg-blue-50 text-blue-700">
                 <Database className="h-3 w-3 mr-1" />
                 Live: {reservoirCount} reservoirs
-              </div>
-            )}
-            {locationData?.coordinates && (
-              <div className="timestamp-badge bg-green-50 text-green-700">
-                <span className="text-xs">📍 Weather: {locationData.coordinates[0].toFixed(2)}, {locationData.coordinates[1].toFixed(2)}</span>
               </div>
             )}
             <Button 
@@ -322,94 +286,62 @@ const Index = () => {
           </div>
         ) : (
           <>
-            {/* Clean Grid Layout for 4 Main Panels */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              {/* Location Information & Current Conditions */}
-              <div className="space-y-6">
-                {enhancedFloodData ? (
-                  <FloodStats floodData={enhancedFloodData} />
-                ) : (
-                  <div className="bg-white rounded-lg border p-6">
-                    <h2 className="text-lg font-semibold mb-2">Location Information</h2>
-                    <p className="text-gray-500">No flood data available for selected region.</p>
-                  </div>
-                )}
-                
-                {enhancedFloodData ? (
-                  <PredictionCard floodData={enhancedFloodData} />
-                ) : (
-                  <div className="bg-white rounded-lg border p-6">
-                    <h2 className="text-lg font-semibold mb-2">Current Conditions</h2>
-                    <p className="text-gray-500">Loading current conditions...</p>
-                  </div>
-                )}
+            {/* Updated layout: content sections */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              <div className="lg:col-span-2 space-y-6">
+                {/* Left side content */}
+                <FloodStats floodData={enhancedFloodData} />
+                <ChartSection selectedRegion={selectedRegion} />
+                <PredictionCard floodData={enhancedFloodData} />
               </div>
               
-              {/* Historical Rainfall & AI Flood Forecast */}
-              <div className="space-y-6">
-                <ChartSection 
-                  selectedRegion={selectedRegion} 
-                  locationData={locationData}
-                />
-              </div>
-            </div>
-            
-            {/* Information Panel */}
-            <div className="bg-white rounded-lg border p-6 mb-6">
-              <h2 className="text-lg font-medium mb-4">Flood Risk Information</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {reservoirCount > 0 && (
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-700 font-medium">
-                      ✓ Live Data Active
-                    </p>
-                    <p className="text-xs text-blue-600">
-                      Analyzing {reservoirCount} reservoir conditions in real-time
-                    </p>
-                    {reservoirLastUpdated && (
-                      <p className="text-xs text-blue-500 mt-1">
-                        Last sync: {reservoirLastUpdated.toLocaleTimeString()}
+              {/* Right side content - additional info, no map here anymore */}
+              <div className="lg:col-span-1">
+                <div className="sticky top-6 bg-white p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-medium mb-2">Flood Risk Information</h2>
+                  
+                  {reservoirCount > 0 && (
+                    <div className="mb-4 p-2 bg-blue-50 rounded">
+                      <p className="text-xs text-blue-700 font-medium">
+                        ✓ Live Data Active
                       </p>
-                    )}
-                  </div>
-                )}
-                
-                {locationData?.rainfall && (
-                  <div className="p-4 bg-green-50 rounded-lg">
-                    <p className="text-sm text-green-700 font-medium">
-                      ✓ Weather Data Loaded
-                    </p>
-                    <p className="text-xs text-green-600">
-                      Historical and forecast rainfall data available
-                    </p>
-                  </div>
-                )}
-                
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h3 className="text-sm font-medium mb-2">Risk Levels</h3>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex items-center">
-                      <span className="w-3 h-3 bg-green-500 rounded-full mr-1"></span>
-                      <span>Low Risk</span>
+                      <p className="text-xs text-blue-600">
+                        Analyzing {reservoirCount} reservoir conditions in real-time
+                      </p>
+                      {reservoirLastUpdated && (
+                        <p className="text-xs text-blue-500 mt-1">
+                          Last sync: {reservoirLastUpdated.toLocaleTimeString()}
+                        </p>
+                      )}
                     </div>
-                    <div className="flex items-center">
-                      <span className="w-3 h-3 bg-yellow-500 rounded-full mr-1"></span>
-                      <span>Medium Risk</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="w-3 h-3 bg-orange-500 rounded-full mr-1"></span>
-                      <span>High Risk</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="w-3 h-3 bg-red-500 rounded-full mr-1"></span>
-                      <span>Severe Risk</span>
+                  )}
+                  
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium mb-2">Risk Levels</h3>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex items-center">
+                        <span className="w-3 h-3 bg-green-500 rounded-full mr-1"></span>
+                        <span>Low Risk</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="w-3 h-3 bg-yellow-500 rounded-full mr-1"></span>
+                        <span>Medium Risk</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="w-3 h-3 bg-orange-500 rounded-full mr-1"></span>
+                        <span>High Risk</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="w-3 h-3 bg-red-500 rounded-full mr-1"></span>
+                        <span>Severe Risk</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
             
+            {/* Toggle button for historical flood data section */}
             <div className="mb-4">
               <Button 
                 variant="outline"
@@ -420,6 +352,7 @@ const Index = () => {
               </Button>
             </div>
             
+            {/* Historical Flood Data Section */}
             {showHistoricalData && <HistoricalFloodData />}
           </>
         )}

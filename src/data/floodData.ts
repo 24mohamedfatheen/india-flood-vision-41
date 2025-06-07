@@ -1,10 +1,11 @@
+// src/data/floodData.ts
+
 import { IMDRegionData } from '../services/imdApiService';
 import { imdApiService } from '../services/imdApiService'; // Import the live API service
 import { staticHistoricalRainfallData } from './staticHistoricalRainfallData'; // Import the new static historical data
 import { parseCsv } from '../utils/csvParser'; // Import the CSV parser
 
 // Hardcoded content of weather.csv for direct use in the browser environment
-// This avoids needing to read a file from the file system.
 const WEATHER_CSV_CONTENT = `
 ,city,lat,lng,country,iso2,admin_name,capital,population,population_proper
 0,Mumbai,19.076,72.8777,India,IN,Maharashtra,admin,20000000,12442373
@@ -46,7 +47,6 @@ export const regions = parsedCities.map(city => ({
 }));
 
 // Ensure FloodData interface is consistent with IMDRegionData for flexibility
-// Added historicalRainfallData to this interface
 export interface FloodData {
   id: number;
   region: string;
@@ -56,7 +56,7 @@ export interface FloodData {
   populationAffected: number;
   coordinates: [number, number]; // [latitude, longitude]
   timestamp: string;
-  currentRainfall: number; // Renamed from 'rainfall' to be explicit about current rainfall
+  currentRainfall: number; // Derived rainfall for charts
   historicalRainfallData: { year: number; month: string; rainfall: number; }[]; // Updated type for multi-year data
   predictionAccuracy: number;
   riverLevel?: number;
@@ -124,49 +124,34 @@ const CACHE_VALIDITY_DURATION = 6 * 60 * 60 * 1000;
 const IMD_CACHE_KEY = 'imd_data_cache';
 
 // Helper function to map IMDRegionData to FloodData
-// This is necessary because IMDRegionData is what imdApiService returns,
-// but floodData and getFloodDataForRegion expect FloodData.
 const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
   const currentYear = new Date().getFullYear();
-  return imdData.map((item, index) => {
-    // Attempt to get static historical data for the region and current year
-    const staticHistorical = staticHistoricalRainfallData[item.district.toLowerCase()]?.filter(d => d.year === currentYear);
+  const mappedData = imdData.map((item, index) => {
+    // currentRainfall Derivation (No Randomness)
+    // Direct, linear, non-random scaling of reservoirPercentage and inflowCusecs
+    let derivedCurrentRainfall = (item.reservoirPercentage * 10) + (item.inflowCusecs / 50);
+    
+    // If calculated value is 0, default to fixed minimum value of 5
+    if (derivedCurrentRainfall === 0) {
+      derivedCurrentRainfall = 5;
+    }
 
-    // If static historical data for the current year is available, use it.
-    // Otherwise, generate a plausible pattern based on the current rainfall from live data.
-    const historicalDataForChart = staticHistorical && staticHistorical.length === 12
-      ? staticHistorical
-      : (() => {
-          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          const baseRainfall = item.rainfall; // This is the derived 'current rainfall' from reservoir data
-          return months.map((month, idx) => {
-            let monthlyRainfall = baseRainfall;
-            if (idx >= 5 && idx <= 8) { // Jun-Sep (monsoon peak)
-              monthlyRainfall = Math.floor(baseRainfall * (1.2 + (Math.random() * 0.4)));
-            } else if (idx >= 9 && idx <= 11) { // Oct-Dec (post-monsoon)
-              monthlyRainfall = Math.floor(baseRainfall * (0.6 + (Math.random() * 0.4)));
-            } else { // Jan-May (pre-monsoon)
-              monthlyRainfall = Math.floor(baseRainfall * (0.3 + (Math.random() * 0.3)));
-            }
-            return { year: currentYear, month, rainfall: Math.max(0, monthlyRainfall) };
-          });
-        })();
-
-    // Find coordinates from the dynamically generated regions
-    const regionCoords = regions.find(r => r.value === item.district.toLowerCase())?.coordinates || item.coordinates;
+    // Find coordinates from the dynamically generated regions and ensure proper tuple type
+    const regionCoords = regions.find(r => r.value === item.district.toLowerCase())?.coordinates;
+    const coordinates: [number, number] = regionCoords ? [regionCoords[0], regionCoords[1]] : [0, 0];
 
     return {
-      id: index + 1, // Generate a simple ID
+      id: index + 1,
       region: item.district,
       state: item.state,
       riskLevel: item.floodRiskLevel,
-      affectedArea: item.affectedArea,
-      populationAffected: item.populationAffected,
-      coordinates: regionCoords as [number, number], // Type assertion to fix coordinates
-      timestamp: new Date().toISOString(), // Use current time for consistency
-      currentRainfall: item.rainfall, // This is the current/derived rainfall
-      historicalRainfallData: historicalDataForChart, // Populate with generated or static historical data
-      predictionAccuracy: 85, // Default or derive from IMDRegionData if available
+      affectedArea: 0, // Remain 0 unless directly provided in Supabase
+      populationAffected: 0, // Remain 0 unless directly provided in Supabase
+      coordinates,
+      timestamp: new Date().toISOString(),
+      currentRainfall: derivedCurrentRainfall,
+      historicalRainfallData: [], // Initialize empty, getHistoricalRainfallData will populate
+      predictionAccuracy: 85,
       riverLevel: item.riverData?.currentLevel,
       predictedFlood: item.predictedFlood,
       riverData: item.riverData ? {
@@ -176,12 +161,13 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
         warningLevel: item.riverData.warningLevel,
         normalLevel: item.riverData.normalLevel,
         trend: item.riverData.trend,
-        source: { name: 'Live Data', url: '' } // Placeholder source
+        source: { name: 'Live Data', url: '' }
       } : undefined,
       activeWarnings: item.activeWarnings,
-      estimatedDamage: { crops: 0, properties: 0, infrastructure: 0 } // Default or derive
+      estimatedDamage: { crops: 0, properties: 0, infrastructure: 0 }
     };
   });
+  return mappedData;
 };
 
 // Load cache from localStorage on init
@@ -195,7 +181,7 @@ const loadCachedData = (): void => {
       if (new Date(parsedCache.expiresAt).getTime() > Date.now()) {
         imdDataCache = parsedCache;
         console.log('Loaded valid IMD data from local storage cache');
-        floodData = mapIMDRegionDataToFloodData(parsedCache.data); // Populate floodData on load
+        floodData = mapIMDRegionDataToFloodData(parsedCache.data);
       } else {
         console.log('Cached IMD data expired, will fetch fresh data');
         localStorage.removeItem(IMD_CACHE_KEY);
@@ -217,7 +203,7 @@ export const fetchImdData = async (forceRefresh = false): Promise<FloodData[]> =
   // Return cached data if available and not forcing refresh
   if (!forceRefresh && imdDataCache && new Date(imdDataCache.expiresAt).getTime() > Date.now()) {
     console.log('Using cached IMD data from', new Date(imdDataCache.timestamp).toLocaleString());
-    floodData = mapIMDRegionDataToFloodData(imdDataCache.data); // Update global floodData
+    floodData = mapIMDRegionDataToFloodData(imdDataCache.data);
     return floodData;
   }
 
@@ -235,51 +221,50 @@ export const fetchImdData = async (forceRefresh = false): Promise<FloodData[]> =
         expiresAt: new Date(now.getTime() + CACHE_VALIDITY_DURATION).toISOString()
       };
 
-      imdDataCache = newCache; // Update in-memory cache
+      imdDataCache = newCache;
       try {
-        localStorage.setItem(IMD_CACHE_KEY, JSON.stringify(newCache)); // Persist cache
+        localStorage.setItem(IMD_CACHE_KEY, JSON.stringify(newCache));
       } catch (storageError) {
         console.warn('Failed to store IMD data in localStorage:', storageError);
       }
 
       console.log('Fresh IMD data fetched from live API and cached at', now.toLocaleString());
-      floodData = mapIMDRegionDataToFloodData(liveImdData); // Update global floodData
+      floodData = mapIMDRegionDataToFloodData(liveImdData);
       return floodData;
     } else {
       console.warn('Live API returned no data. Falling back to static data.');
-      // Fallback to static data from staticHistoricalRainfallData
-      // Create FloodData objects for each region, populating historicalRainfallData
-      floodData = regions.map(r => {
-        const staticHistorical = staticHistoricalRainfallData[r.value];
+      // Fallback to static data only for regions with no live data
+      const staticFallbackData = regions.map(r => {
         const currentYear = new Date().getFullYear();
-        const currentYearData = staticHistorical?.filter(d => d.year === currentYear);
+        const historicalForRegion = staticHistoricalRainfallData[r.value.toLowerCase()];
 
-        // If specific year data is not available in staticHistoricalRainfallData,
-        // we'll use a placeholder or average for currentRainfall and generate historical
-        // for the current year based on that.
-        let currentRainfallValue = 0;
-        if (currentYearData && currentYearData.length > 0) {
-          currentRainfallValue = currentYearData.reduce((sum, item) => sum + item.rainfall, 0) / currentYearData.length;
-        } else if (staticHistorical && staticHistorical.length > 0) {
-          // If current year data is not present, take an average from all available static years
-          const allStaticRainfall = staticHistorical.map(d => d.rainfall);
-          currentRainfallValue = allStaticRainfall.reduce((sum, val) => sum + val, 0) / allStaticRainfall.length;
+        let currentRainfallValue = 5; // Fixed minimum as specified
+        if (historicalForRegion && historicalForRegion.length > 0) {
+          const currentYearStatic = historicalForRegion.filter(d => d.year === currentYear);
+          if (currentYearStatic.length > 0) {
+            currentRainfallValue = Math.max(5, currentYearStatic.reduce((sum, item) => sum + item.rainfall, 0) / currentYearStatic.length);
+          } else {
+            currentRainfallValue = Math.max(5, historicalForRegion.reduce((sum, item) => sum + item.rainfall, 0) / historicalForRegion.length);
+          }
         }
+
+        const coordinates: [number, number] = [r.coordinates[0], r.coordinates[1]];
 
         return {
           id: regions.indexOf(r) + 1,
           region: r.label,
           state: r.state,
-          riskLevel: 'low' as const, // Default, could be derived from static data if available
-          affectedArea: 0,
-          populationAffected: 0,
-          coordinates: r.coordinates as [number, number], // Type assertion to fix coordinates
+          riskLevel: 'low' as const,
+          affectedArea: 0, // No dummy data
+          populationAffected: 0, // No dummy data
+          coordinates,
           timestamp: new Date().toISOString(),
-          currentRainfall: Math.floor(currentRainfallValue),
-          historicalRainfallData: staticHistorical || [], // Use the full static historical data
+          currentRainfall: currentRainfallValue,
+          historicalRainfallData: [],
           predictionAccuracy: 70,
         };
       });
+      floodData = staticFallbackData;
       return floodData;
     }
 
@@ -289,26 +274,14 @@ export const fetchImdData = async (forceRefresh = false): Promise<FloodData[]> =
     // If fetch fails but we have cached data, use it even if expired
     if (imdDataCache) {
       console.log('Using expired cached data due to fetch failure');
-      floodData = mapIMDRegionDataToFloodData(imdDataCache.data); // Update global floodData
+      floodData = mapIMDRegionDataToFloodData(imdDataCache.data);
       return floodData;
     }
 
-    // Return static data if no cached data available and live fetch failed
+    // Return static data if no cached data available
     console.log('No cached data, returning static data.');
-    // Fallback to static data from staticHistoricalRainfallData
-    floodData = regions.map(r => {
-      const staticHistorical = staticHistoricalRainfallData[r.value];
-      const currentYear = new Date().getFullYear();
-      const currentYearData = staticHistorical?.filter(d => d.year === currentYear);
-
-      let currentRainfallValue = 0;
-      if (currentYearData && currentYearData.length > 0) {
-        currentRainfallValue = currentYearData.reduce((sum, item) => sum + item.rainfall, 0) / currentYearData.length;
-      } else if (staticHistorical && staticHistorical.length > 0) {
-        const allStaticRainfall = staticHistorical.map(d => d.rainfall);
-        currentRainfallValue = allStaticRainfall.reduce((sum, val) => sum + val, 0) / allStaticRainfall.length;
-      }
-
+    const staticFallbackData = regions.map(r => {
+      const coordinates: [number, number] = [r.coordinates[0], r.coordinates[1]];
       return {
         id: regions.indexOf(r) + 1,
         region: r.label,
@@ -316,13 +289,14 @@ export const fetchImdData = async (forceRefresh = false): Promise<FloodData[]> =
         riskLevel: 'low' as const,
         affectedArea: 0,
         populationAffected: 0,
-        coordinates: r.coordinates as [number, number], // Type assertion to fix coordinates
+        coordinates,
         timestamp: new Date().toISOString(),
-        currentRainfall: Math.floor(currentRainfallValue),
-        historicalRainfallData: staticHistorical || [],
+        currentRainfall: 5, // Fixed minimum
+        historicalRainfallData: [],
         predictionAccuracy: 70,
       };
     });
+    floodData = staticFallbackData;
     return floodData;
   }
 };
@@ -339,45 +313,45 @@ export const getFloodDataForRegion = (region: string): FloodData | null => {
   }
 
   // If no match is found, return Mumbai as default from the current floodData
-  return floodData[0] || null; // Ensure floodData[0] exists
+  return floodData[0] || null;
 };
 
-// Add functions for chart section
+// historicalRainfallData (Strictly Static)
 export const getHistoricalRainfallData = (region: string, year: number) => {
-  const regionData = getFloodDataForRegion(region);
+  const regionLower = region.toLowerCase();
+  const historicalForRegion = staticHistoricalRainfallData[regionLower];
 
-  if (!regionData || !regionData.historicalRainfallData || regionData.historicalRainfallData.length === 0) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months.map(month => ({ month, rainfall: 0 }));
+  if (!historicalForRegion || historicalForRegion.length === 0) {
+    // If region not found in staticHistoricalRainfallData, return empty array
+    return [];
   }
 
-  // Filter historical data by the selected year
-  const yearData = regionData.historicalRainfallData.filter(d => d.year === year);
+  // Filter for the specific year from static data
+  const yearData = historicalForRegion.filter(d => d.year === year);
 
-  if (yearData.length === 0) {
-    // If no specific year data is found, we can try to generate a plausible pattern
-    // based on the overall average of the static data for that region if available,
-    // or a default.
+  if (yearData.length > 0) {
+    // If year-specific data is found, use it directly
+    return yearData.map(d => ({ month: d.month, rainfall: d.rainfall }));
+  } else {
+    // If static data exists for region but not for specific year,
+    // calculate average pattern from available static years (non-random)
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const allRainfallValues = regionData.historicalRainfallData.map(d => d.rainfall);
-    const averageRainfall = allRainfallValues.length > 0 ? allRainfallValues.reduce((sum, val) => sum + val, 0) / allRainfallValues.length : 0;
+    const averageMonthlyPattern: Record<string, number> = {};
 
-    // Generate a plausible pattern for the selected year based on average
-    return months.map((month, idx) => {
-      let monthlyRainfall = averageRainfall;
-      if (idx >= 5 && idx <= 8) { // Jun-Sep (monsoon peak)
-        monthlyRainfall = Math.floor(averageRainfall * (1.2 + (Math.random() * 0.4)));
-      } else if (idx >= 9 && idx <= 11) { // Oct-Dec (post-monsoon)
-        monthlyRainfall = Math.floor(averageRainfall * (0.6 + (Math.random() * 0.4)));
-      } else { // Jan-May (pre-monsoon)
-        monthlyRainfall = Math.floor(averageRainfall * (0.3 + (Math.random() * 0.3)));
-      }
-      return { month, rainfall: Math.max(0, monthlyRainfall) };
+    // Calculate average rainfall for each month across all static years
+    months.forEach(month => {
+      const monthlyValues = historicalForRegion.filter(d => d.month === month).map(d => d.rainfall);
+      averageMonthlyPattern[month] = monthlyValues.length > 0
+        ? monthlyValues.reduce((sum, val) => sum + val, 0) / monthlyValues.length
+        : 0;
     });
-  }
 
-  // If year-specific data is found, return it
-  return yearData.map(d => ({ month: d.month, rainfall: d.rainfall }));
+    return months.map(month => ({
+      year: year,
+      month,
+      rainfall: Math.floor(averageMonthlyPattern[month] || 0)
+    }));
+  }
 };
 
 export const getPredictionData = (region: string) => {
@@ -390,28 +364,35 @@ export const getPredictionData = (region: string) => {
     'severe': 70
   };
 
-  const baseValue = riskLevelBase[regionData?.riskLevel || 'medium'];
+  // Base prediction value influenced by derived currentRainfall (no randomness)
+  let baseValue = riskLevelBase[regionData?.riskLevel || 'medium'];
 
-  // Generate 10 days of prediction data with some randomness
+  if (regionData && regionData.currentRainfall) {
+    // For every 100mm of current rainfall above 50mm threshold, increase baseValue by 5
+    const rainfallEffect = Math.max(0, Math.floor((regionData.currentRainfall - 50) / 100) * 5);
+    baseValue += rainfallEffect;
+  }
+  // Cap baseValue to reasonable max
+  baseValue = Math.min(80, baseValue);
+
+  // Generate 10 days of prediction data with deterministic trends (no randomness)
   return Array.from({ length: 10 }, (_, i) => {
     let trendFactor = 1;
 
-    // Create a trend based on day
+    // Create deterministic trend based on day
     if (i < 3) {
       // First 3 days - increasing trend
-      trendFactor = 1 + (i * 0.1);
+      trendFactor = 1 + (i * 0.05);
     } else if (i >= 3 && i < 6) {
-      // Middle days - peak
-      trendFactor = 1.3 - ((i - 3) * 0.05);
+      // Middle days - peak then descent
+      trendFactor = 1.15 - ((i - 3) * 0.03);
     } else {
       // Last days - decreasing trend
-      trendFactor = 1.15 - ((i - 6) * 0.1);
+      trendFactor = 1.05 - ((i - 6) * 0.05);
     }
 
-    // Calculate probability with some randomness
-    const probability = Math.min(95, Math.max(5,
-      baseValue * trendFactor + (Math.random() * 10 - 5)
-    ));
+    // Calculate probability with deterministic variation, clamped to 5-95 range
+    const probability = Math.min(95, Math.max(5, baseValue * trendFactor));
 
     return {
       day: i + 1,

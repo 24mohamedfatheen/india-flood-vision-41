@@ -1,276 +1,399 @@
 
-import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Brain, Loader2, AlertTriangle, TrendingUp, Calendar } from 'lucide-react';
+import React from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { format, isValid, parseISO } from 'date-fns';
+import { useCursorAiForecast } from '../hooks/useCursorAiForecast';
+import { getFloodDataForRegion } from '../data/floodData';
 import { Button } from './ui/button';
-import { generateFloodPrediction } from '../services/imdApiService';
-import { useToast } from '../hooks/use-toast';
+import { Skeleton } from './ui/skeleton';
+import { AlertCircle, AlertTriangle, CloudRain, RefreshCw, Droplet, ArrowUp, ArrowDown, Info, Wind } from 'lucide-react';
+import { Badge } from './ui/badge';
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Card, CardContent } from './ui/card';
 
 interface AiFloodForecastProps {
   selectedRegion: string;
-  locationData?: {
-    coordinates: [number, number];
-    rainfall: any;
-    reservoirData?: any[];
-  };
 }
 
-const AiFloodForecast: React.FC<AiFloodForecastProps> = ({ 
-  selectedRegion, 
-  locationData 
-}) => {
-  const [forecast, setForecast] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
+const AiFloodForecast: React.FC<AiFloodForecastProps> = ({ selectedRegion }) => {
+  // Get region details
+  const floodData = getFloodDataForRegion(selectedRegion);
+  
+  // Use our custom hook to fetch forecast data
+  const { data, analysis, isLoading, error, refetch } = useCursorAiForecast({
+    region: selectedRegion,
+    state: floodData?.state,
+    coordinates: floodData?.coordinates,
+    days: 10
+  });
 
-  // Generate forecast when location data changes
-  useEffect(() => {
-    if (locationData?.coordinates && locationData?.rainfall) {
-      generateForecast();
+  // Format the forecast data for the chart
+  const chartData = React.useMemo(() => {
+    if (!data?.forecasts) return [];
+    
+    return data.forecasts.map(item => {
+      let date;
+      try {
+        date = parseISO(item.date);
+      } catch (e) {
+        date = new Date(); // Fallback
+      }
+      
+      return {
+        ...item,
+        date,
+        formattedDate: format(date, 'yyyy-MM-dd')
+      };
+    });
+  }, [data]);
+
+  // Format a date safely
+  const safeDateFormat = (dateValue: string | Date | number, formatStr: string) => {
+    let date;
+    
+    if (typeof dateValue === 'string') {
+      try {
+        date = parseISO(dateValue);
+      } catch (e) {
+        date = new Date(dateValue);
+      }
+    } else if (dateValue instanceof Date) {
+      date = dateValue;
+    } else if (typeof dateValue === 'number') {
+      date = new Date(dateValue);
+    } else {
+      return 'Invalid date';
     }
-  }, [locationData]);
-
-  const generateForecast = async () => {
-    if (!locationData?.coordinates) {
-      setError('Location coordinates not available');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
+    
+    if (!isValid(date)) return 'Invalid date';
+    
     try {
-      // Simulate reservoir data if not provided
-      const mockReservoirData = locationData.reservoirData || [
-        {
-          percentage_full: Math.random() * 100,
-          inflow_cusecs: Math.random() * 15000,
-          outflow_cusecs: Math.random() * 10000
-        }
-      ];
-
-      const predictionResult = generateFloodPrediction(
-        mockReservoirData,
-        locationData.rainfall,
-        locationData.coordinates
-      );
-
-      // Transform for chart display
-      const chartData = predictionResult.predictions.map((pred, index) => ({
-        day: `Day ${index + 1}`,
-        date: pred.date,
-        probability: pred.probability,
-        confidence: pred.confidence,
-        expectedRainfall: locationData.rainfall?.forecast?.precipitation?.[index] || 0
-      }));
-
-      setForecast({
-        predictions: predictionResult.predictions,
-        chartData,
-        summary: {
-          maxProbability: Math.max(...predictionResult.predictions.map(p => p.probability)),
-          avgConfidence: Math.round(predictionResult.predictions.reduce((sum, p) => sum + p.confidence, 0) / predictionResult.predictions.length),
-          riskTrend: predictionResult.predictions[0].probability > predictionResult.predictions[9].probability ? 'decreasing' : 'increasing'
-        }
-      });
-
-      toast({
-        title: "Forecast Updated",
-        description: "10-day flood probability forecast generated using AI analysis",
-        duration: 3000
-      });
-
-    } catch (error) {
-      console.error('Error generating forecast:', error);
-      setError('Failed to generate flood forecast');
-      toast({
-        title: "Forecast Error",
-        description: "Could not generate flood forecast. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
+      return format(date, formatStr);
+    } catch (e) {
+      return 'Format error';
     }
   };
+  
+  // Determine badge color based on risk level
+  const riskLevelColor = React.useMemo(() => {
+    if (!floodData) return "bg-blue-500";
+    
+    switch (floodData.riskLevel) {
+      case 'severe': return "bg-red-500";
+      case 'high': return "bg-orange-500";
+      case 'medium': return "bg-yellow-400";
+      case 'low': return "bg-green-500";
+      default: return "bg-blue-500";
+    }
+  }, [floodData]);
 
-  const getRiskColor = (probability: number) => {
-    if (probability >= 80) return '#DC2626'; // red-600
-    if (probability >= 60) return '#EA580C'; // orange-600
-    if (probability >= 40) return '#D97706'; // amber-600
-    if (probability >= 20) return '#65A30D'; // lime-600
-    return '#16A34A'; // green-600
-  };
-
-  const getRiskLevel = (probability: number) => {
-    if (probability >= 80) return 'Severe';
-    if (probability >= 60) return 'High';
-    if (probability >= 40) return 'Medium';
-    if (probability >= 20) return 'Low';
-    return 'Very Low';
-  };
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flood-card">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h2 className="section-title">10-Day Flood Probability Forecast</h2>
+            <p className="text-sm text-muted-foreground flex items-center">
+              <CloudRain className="h-3.5 w-3.5 mr-1" />
+              Developed with Cursor IDE
+            </p>
+          </div>
+        </div>
+        
+        <div className="h-[300px] flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-sm font-medium">Loading forecast data...</p>
+            <p className="text-xs text-muted-foreground mt-1">Analyzing flood risk patterns</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Error state
+  if (error && !data) {
+    return (
+      <div className="flood-card">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h2 className="section-title">10-Day Flood Probability Forecast</h2>
+            <p className="text-sm text-muted-foreground flex items-center">
+              <AlertCircle className="h-3.5 w-3.5 mr-1 text-red-500" />
+              Forecast Unavailable
+            </p>
+          </div>
+          <Button size="sm" onClick={refetch} className="h-8">
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Retry
+          </Button>
+        </div>
+        
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
+            <div>
+              <h3 className="font-medium text-red-800">Unable to load forecast</h3>
+              <p className="text-sm text-red-600 mt-1">
+                We're having trouble generating the forecast.
+                Please try again later.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flood-card">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <Brain className="mr-2 h-5 w-5 text-blue-600" />
-          <h2 className="section-title">AI Flood Forecast</h2>
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="section-title">10-Day Flood Probability Forecast</h2>
+            <Badge variant="outline" className={`${riskLevelColor} text-white text-xs`}>
+              {floodData?.riskLevel.toUpperCase()}
+            </Badge>
+          </div>
+          <div className="flex flex-col gap-1 mt-1">
+            <p className="text-xs text-muted-foreground flex items-center">
+              <CloudRain className="h-3.5 w-3.5 mr-1 text-blue-600" />
+              Developed with Cursor IDE • Last updated: {data?.timestamp ? safeDateFormat(data.timestamp, 'MMM dd, yyyy, h:mm a') : 'Unknown'}
+            </p>
+            {data?.dataSourceInfo && (
+              <p className="text-xs text-muted-foreground flex items-center">
+                <Info className="h-3.5 w-3.5 mr-1 text-blue-600" />
+                Data: {data.dataSourceInfo.weather?.source || 'Weather data unavailable'} 
+                {data.dataSourceInfo.rivers && ` • ${data.dataSourceInfo.rivers.source}`}
+              </p>
+            )}
+          </div>
         </div>
         <Button 
-          onClick={generateForecast} 
-          disabled={loading || !locationData?.coordinates}
-          size="sm"
-          className="h-8"
+          size="sm" 
+          variant="outline" 
+          className="h-8 mt-2 md:mt-0"
+          onClick={refetch}
         >
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <TrendingUp className="mr-2 h-4 w-4" />
-              Update Forecast
-            </>
-          )}
+          <RefreshCw className="h-3 w-3 mr-1.5" />
+          Refresh
         </Button>
       </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+      
+      {data?.modelInfo && (
+        <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-md mb-4 text-xs">
           <div className="flex items-center">
-            <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />
-            <span className="text-sm text-red-800">{error}</span>
+            <AlertCircle className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
+            <span>
+              Using forecast algorithm <strong>{data.modelInfo.version}</strong> 
+              with {data.modelInfo.accuracy}% accuracy
+              {data.modelInfo.lastUpdated && ` • Last updated: ${safeDateFormat(data.modelInfo.lastUpdated, 'MMM dd, yyyy')}`}
+            </span>
           </div>
         </div>
       )}
-
-      {!locationData?.coordinates && !loading && (
-        <div className="text-center py-8 text-gray-500">
-          <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p>Select a location to generate AI flood forecast</p>
-          <p className="text-xs mt-1">Forecast uses real-time reservoir levels and weather data</p>
-        </div>
-      )}
-
-      {loading && (
-        <div className="text-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-blue-600" />
-          <p className="text-gray-600">Analyzing flood probability...</p>
-          <p className="text-xs text-gray-500 mt-1">Processing reservoir levels, rainfall patterns, and historical data</p>
-        </div>
-      )}
-
-      {forecast && !loading && (
-        <div className="space-y-4">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-blue-900">
-                {forecast.summary.maxProbability}%
+      
+      {analysis && (
+        <Card className="mb-4 bg-slate-50">
+          <CardContent className="p-3">
+            <h3 className="text-sm font-semibold mb-2">Forecast Analysis</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="flex items-center text-xs">
+                    <AlertTriangle className="h-3.5 w-3.5 mr-1.5 text-orange-500" />
+                    Highest Risk Day:
+                  </span>
+                  <span className="font-medium text-xs">
+                    {safeDateFormat(analysis.highestRiskDay.date, 'MMM dd')} ({analysis.highestRiskDay.probability}%)
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span>Average Risk Level:</span>
+                  <span className="font-medium">{analysis.averageProbability}%</span>
+                </div>
               </div>
-              <div className="text-xs text-blue-700">Peak Risk</div>
-            </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-green-900">
-                {forecast.summary.avgConfidence}%
-              </div>
-              <div className="text-xs text-green-700">Avg Confidence</div>
-            </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
-              <div className="text-lg font-bold text-amber-900 capitalize">
-                {forecast.summary.riskTrend}
-              </div>
-              <div className="text-xs text-amber-700">Trend</div>
-            </div>
-          </div>
-
-          {/* Chart */}
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={forecast.chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="day" 
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis 
-                  domain={[0, 100]}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip 
-                  formatter={(value, name) => [
-                    `${value}${name === 'probability' ? '%' : name === 'expectedRainfall' ? 'mm' : '%'}`, 
-                    name === 'probability' ? 'Flood Probability' : 
-                    name === 'confidence' ? 'Confidence' : 'Expected Rainfall'
-                  ]}
-                  labelFormatter={(label, payload) => {
-                    if (payload && payload[0]) {
-                      return `${label} (${payload[0].payload.date})`;
-                    }
-                    return label;
-                  }}
-                />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="probability" 
-                  stroke="#DC2626" 
-                  strokeWidth={3}
-                  name="Flood Probability (%)"
-                  dot={{ fill: '#DC2626', strokeWidth: 2 }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="confidence" 
-                  stroke="#16A34A" 
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  name="Confidence (%)"
-                  dot={{ fill: '#16A34A', strokeWidth: 2 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Daily Breakdown */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-gray-700">10-Day Detailed Forecast</h3>
-            <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
-              {forecast.predictions.slice(0, 10).map((pred: any, index: number) => (
-                <div 
-                  key={index}
-                  className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs"
-                >
-                  <div className="flex items-center">
-                    <div 
-                      className="w-3 h-3 rounded-full mr-2"
-                      style={{ backgroundColor: getRiskColor(pred.probability) }}
-                    />
-                    <span className="font-medium">Day {index + 1}</span>
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span>Initial Trend:</span>
+                  <span className="font-medium flex items-center">
+                    {analysis.initialTrend === 'rising' ? (
+                      <>Rising <ArrowUp className="h-3 w-3 ml-1 text-red-500" /></>
+                    ) : analysis.initialTrend === 'falling' ? (
+                      <>Falling <ArrowDown className="h-3 w-3 ml-1 text-green-500" /></>
+                    ) : (
+                      'Stable'
+                    )}
+                  </span>
+                </div>
+                {analysis.sustainedHighRisk && (
+                  <div className="text-xs flex items-center gap-1 text-red-600 font-medium">
+                    <AlertCircle className="h-3.5 w-3.5 text-red-600" />
+                    <span>Warning: Sustained high risk detected</span>
                   </div>
-                  <div className="text-right">
-                    <div className="font-semibold">{pred.probability}%</div>
-                    <div className="text-gray-500">{getRiskLevel(pred.probability)}</div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      <div className="h-[300px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="date" 
+              tickFormatter={(date) => safeDateFormat(date, 'MMM dd')}
+            />
+            <YAxis 
+              domain={[0, 100]} 
+              tickFormatter={(value) => `${value}%`} 
+            />
+            <Tooltip
+              formatter={(value, name) => {
+                if (name === 'Flood Probability') return [`${Number(value).toFixed(1)}%`, name];
+                if (name === 'Confidence') return [`${Number(value).toFixed(1)}%`, name];
+                return [value, name];
+              }}
+              labelFormatter={(date) => safeDateFormat(date, 'MMMM d, yyyy')}
+            />
+            <Legend />
+            <ReferenceLine y={75} stroke="red" strokeDasharray="3 3" label={{ value: "Severe Risk", position: "insideBottomRight", fill: "red", fontSize: 10 }} />
+            <ReferenceLine y={50} stroke="orange" strokeDasharray="3 3" label={{ value: "High Risk", position: "insideBottomRight", fill: "orange", fontSize: 10 }} />
+            <Line
+              type="monotone"
+              dataKey="probability"
+              name="Flood Probability"
+              stroke="#FF9800"
+              strokeWidth={2}
+              dot={{ r: 4 }}
+              activeDot={{ r: 6 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="confidence"
+              name="Confidence"
+              stroke="#9e9e9e"
+              strokeWidth={1}
+              strokeDasharray="5 5"
+              dot={{ r: 3 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      
+      {data && chartData.length > 0 && (
+        <div className="mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium flex items-center">
+                <Droplet className="h-4 w-4 mr-1.5 text-blue-600" />
+                Contributing Factors
+              </h3>
+              <div className="bg-muted p-2 rounded-sm">
+                <div className="text-xs space-y-1">
+                  {data.forecasts[0].factors?.rainfall !== undefined && (
+                    <div className="flex justify-between">
+                      <span className="flex items-center">
+                        <CloudRain className="h-3 w-3 mr-1 text-blue-600" /> Rainfall:
+                      </span>
+                      <TooltipProvider>
+                        <UITooltip>
+                          <TooltipTrigger asChild>
+                            <span className="font-medium">
+                              {data.forecasts[0].factors.rainfall}%
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Contribution to overall risk</p>
+                          </TooltipContent>
+                        </UITooltip>
+                      </TooltipProvider>
+                    </div>
+                  )}
+                  
+                  {data.forecasts[0].factors?.riverLevel !== undefined && (
+                    <div className="flex justify-between">
+                      <span className="flex items-center">
+                        <Droplet className="h-3 w-3 mr-1 text-blue-600" /> River Level:
+                      </span>
+                      <span className="font-medium">
+                        {data.forecasts[0].factors.riverLevel}%
+                      </span>
+                    </div>
+                  )}
+                  
+                  {data.forecasts[0].factors?.groundSaturation !== undefined && (
+                    <div className="flex justify-between">
+                      <span className="flex items-center">
+                        <Wind className="h-3 w-3 mr-1 text-blue-600" /> Ground Saturation:
+                      </span>
+                      <span className="font-medium">
+                        {data.forecasts[0].factors.groundSaturation}%
+                      </span>
+                    </div>
+                  )}
+                  
+                  {data.forecasts[0].factors?.terrain !== undefined && (
+                    <div className="flex justify-between">
+                      <span>Terrain Impact:</span>
+                      <span className="font-medium">
+                        {data.forecasts[0].factors.terrain}%
+                      </span>
+                    </div>
+                  )}
+                  
+                  {data.forecasts[0].factors?.historicalPattern !== undefined && (
+                    <div className="flex justify-between">
+                      <span>Historical Pattern:</span>
+                      <span className="font-medium">
+                        {data.forecasts[0].factors.historicalPattern}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium flex items-center">
+                <CloudRain className="h-4 w-4 mr-1.5 text-blue-600" />
+                Current Conditions
+              </h3>
+              <div className="bg-muted p-2 rounded-sm">
+                <div className="text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span>Expected Rainfall:</span>
+                    <span className="font-medium">
+                      {data.forecasts[0]?.expectedRainfall || "N/A"} mm
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>River Level Change:</span>
+                    <span className="font-medium">
+                      +{data.forecasts[0]?.riverLevelChange || "N/A"} m
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Confidence Level:</span>
+                    <span className="font-medium">
+                      {data.forecasts[0]?.confidence || "N/A"}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-amber-700">
+                    <span>Current Risk:</span>
+                    <span className="font-medium">
+                      {data.forecasts[0]?.probability || "N/A"}%
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* AI Disclaimer */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="flex items-start">
-              <Brain className="h-4 w-4 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-              <div className="text-xs text-blue-800">
-                <p className="font-medium mb-1">AI-Powered Analysis</p>
-                <p>
-                  This forecast combines real-time reservoir levels, weather patterns, and historical data 
-                  using machine learning algorithms. Predictions should be used alongside official weather warnings.
-                </p>
               </div>
             </div>
+          </div>
+          
+          <div className="mt-4 text-xs text-muted-foreground border-t pt-2">
+            <p>This forecast uses a combination of weather data, river monitoring, historical patterns, and terrain analysis. Future versions will incorporate machine learning models for improved accuracy.</p>
           </div>
         </div>
       )}

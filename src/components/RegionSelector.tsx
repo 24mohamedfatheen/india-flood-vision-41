@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { MapPin, Loader2 } from 'lucide-react';
-import { fetchStatesFromReservoirs, fetchDistrictsForState, getDistrictCoordinates, fetchRainfallData } from '../services/imdApiService';
+import { MapPin } from 'lucide-react';
+import { regions } from '../data/floodData';
+import { indiaStatesAndDistricts, getDistrictsForState, getDistrictFullData } from '../data/indiaStatesDistricts';
 import {
   Select,
   SelectContent,
@@ -9,177 +10,49 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { useToast } from "../hooks/use-toast";
-import { supabase } from '../integrations/supabase/client';
 
 interface RegionSelectorProps {
   selectedRegion: string;
   onRegionChange: (value: string) => void;
-  onLocationData?: (data: { coordinates: [number, number], rainfall: any }) => void;
 }
 
-const RegionSelector: React.FC<RegionSelectorProps> = ({ 
-  selectedRegion, 
-  onRegionChange, 
-  onLocationData 
-}) => {
+const RegionSelector: React.FC<RegionSelectorProps> = ({ selectedRegion, onRegionChange }) => {
   const [selectedState, setSelectedState] = useState<string>("");
   const [selectedDistrict, setSelectedDistrict] = useState<string>("");
-  const [availableStates, setAvailableStates] = useState<string[]>([]);
-  const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
-  const [loadingStates, setLoadingStates] = useState<boolean>(true);
-  const [loadingDistricts, setLoadingDistricts] = useState<boolean>(false);
-  const [loadingRainfall, setLoadingRainfall] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const { toast } = useToast();
+  const [availableDistricts, setAvailableDistricts] = useState<{ value: string; label: string }[]>([]);
   
-  // Load states on component mount
-  useEffect(() => {
-    const loadStates = async () => {
-      setLoadingStates(true);
-      setErrorMessage(null);
-      try {
-        console.log('Fetching states from Supabase...');
-        const { data, error } = await supabase
-          .from('indian_reservoir_levels')
-          .select('state')
-          .not('state', 'is', null);
-        
-        console.log('Supabase response:', data, error);
-        
-        if (error) {
-          throw new Error(error.message);
-        }
-        
-        if (data && data.length > 0) {
-          const uniqueStates = [...new Set(data.map((row) => row.state))].sort();
-          console.log('Unique states:', uniqueStates);
-          setAvailableStates(uniqueStates);
-        } else {
-          setErrorMessage("No states found in database");
-        }
-      } catch (error) {
-        console.error('Error loading states:', error);
-        setErrorMessage("Could not fetch states. Please try again.");
-        toast({
-          title: "Error",
-          description: "Failed to load states from database",
-          variant: "destructive"
-        });
-      } finally {
-        setLoadingStates(false);
-      }
-    };
-    
-    loadStates();
-  }, [toast]);
-
-  // Load districts when state changes
+  // When a state is selected, update the available districts
   useEffect(() => {
     if (selectedState) {
-      const loadDistricts = async () => {
-        setLoadingDistricts(true);
-        setErrorMessage(null);
-        try {
-          console.log('Fetching districts for state:', selectedState);
-          const { data, error } = await supabase
-            .from('indian_reservoir_levels')
-            .select('district')
-            .eq('state', selectedState)
-            .not('district', 'is', null);
-          
-          console.log('Districts response:', data, error);
-          
-          if (error) {
-            throw new Error(error.message);
-          }
-          
-          if (data && data.length > 0) {
-            const uniqueDistricts = [...new Set(data.map((row) => row.district))].sort();
-            console.log('Unique districts:', uniqueDistricts);
-            setAvailableDistricts(uniqueDistricts);
-          } else {
-            setAvailableDistricts([]);
-          }
-          setSelectedDistrict(""); // Reset district selection
-        } catch (error) {
-          console.error('Error loading districts:', error);
-          setErrorMessage("Could not fetch districts. Please try again.");
-          toast({
-            title: "Error",
-            description: "Failed to load districts for selected state",
-            variant: "destructive"
-          });
-        } finally {
-          setLoadingDistricts(false);
-        }
-      };
+      const districts = getDistrictsForState(selectedState);
+      setAvailableDistricts(districts);
       
-      loadDistricts();
-    } else {
-      setAvailableDistricts([]);
+      // Reset district selection when state changes
       setSelectedDistrict("");
     }
-  }, [selectedState, toast]);
+  }, [selectedState]);
 
   // Handle state selection
   const handleStateChange = (value: string) => {
     setSelectedState(value);
-    setSelectedDistrict("");
-    console.log('State selected:', value);
   };
   
-  // Handle district selection and fetch additional data
-  const handleDistrictChange = async (value: string) => {
+  // Handle district selection
+  const handleDistrictChange = (value: string) => {
     setSelectedDistrict(value);
-    console.log('District selected:', value);
     
-    if (selectedState && value) {
-      setLoadingRainfall(true);
-      setErrorMessage(null);
-      
-      try {
-        // Get coordinates for the district
-        const coordinates = await getDistrictCoordinates(selectedState, value);
-        
-        if (coordinates) {
-          // Fetch rainfall data for the coordinates
-          const rainfallData = await fetchRainfallData(coordinates[0], coordinates[1]);
-          
-          // Pass location data to parent component
-          if (onLocationData) {
-            onLocationData({
-              coordinates,
-              rainfall: rainfallData
-            });
-          }
-          
-          // Update selected region for compatibility with existing system
-          onRegionChange(value.toLowerCase().replace(/\s+/g, ''));
-          
-          toast({
-            title: "Location Selected",
-            description: `${value}, ${selectedState} - Weather data loaded`,
-            duration: 3000
-          });
-        } else {
-          toast({
-            title: "Warning",
-            description: "Could not find coordinates for selected district",
-            variant: "destructive"
-          });
-        }
-      } catch (error) {
-        console.error('Error processing district selection:', error);
-        setErrorMessage("Could not load weather data. Please try again.");
-        toast({
-          title: "Error",
-          description: "Failed to load weather data for selected location",
-          variant: "destructive"
-        });
-      } finally {
-        setLoadingRainfall(false);
-      }
+    // Find the matching region in the flood data if possible
+    // In a real app, you would probably map districts to regions more precisely
+    const matchingRegion = regions.find(region => 
+      region.label.toLowerCase().includes(value) || 
+      value.includes(region.label.toLowerCase())
+    );
+    
+    if (matchingRegion) {
+      onRegionChange(matchingRegion.value);
+    } else {
+      // If no direct match in regions data, use the district value as region
+      onRegionChange(value);
     }
   };
 
@@ -187,20 +60,8 @@ const RegionSelector: React.FC<RegionSelectorProps> = ({
     <div className="bg-white rounded-lg border border-border p-4 shadow-sm mb-6">
       <div className="flex items-center mb-4">
         <MapPin className="mr-2 h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold">Select Location</h2>
-        {loadingRainfall && (
-          <div className="ml-2 flex items-center">
-            <Loader2 className="h-4 w-4 animate-spin mr-1" />
-            <span className="text-sm text-muted-foreground">Loading weather data...</span>
-          </div>
-        )}
+        <h2 className="text-lg font-semibold">Select Region</h2>
       </div>
-      
-      {errorMessage && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-800">{errorMessage}</p>
-        </div>
-      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* State Selection */}
@@ -208,85 +69,72 @@ const RegionSelector: React.FC<RegionSelectorProps> = ({
           <label htmlFor="state-select" className="block text-sm font-medium mb-2 text-muted-foreground">
             Select a state in India:
           </label>
-          <Select value={selectedState} onValueChange={handleStateChange} disabled={loadingStates}>
+          <Select value={selectedState} onValueChange={handleStateChange}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder={loadingStates ? "Loading states..." : "Select a state"} />
+              <SelectValue placeholder="Select a state" />
             </SelectTrigger>
             <SelectContent>
-              {availableStates.map((state) => (
-                <SelectItem key={state} value={state}>
-                  {state}
+              {indiaStatesAndDistricts.map((state) => (
+                <SelectItem key={state.value} value={state.value}>
+                  {state.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         
-        {/* District Selection */}
-        <div>
-          <label htmlFor="district-select" className="block text-sm font-medium mb-2 text-muted-foreground">
-            Select a district:
-          </label>
-          <Select 
-            value={selectedDistrict} 
-            onValueChange={handleDistrictChange}
-            disabled={!selectedState || loadingDistricts}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={
-                !selectedState ? "Select a state first" :
-                loadingDistricts ? "Loading districts..." :
-                "Select a district"
-              } />
-            </SelectTrigger>
-            <SelectContent>
-              {availableDistricts.map((district) => (
-                <SelectItem key={district} value={district}>
-                  {district}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* District Selection - only shown if a state is selected */}
+        {selectedState && (
+          <div>
+            <label htmlFor="district-select" className="block text-sm font-medium mb-2 text-muted-foreground">
+              Select a district:
+            </label>
+            <Select value={selectedDistrict} onValueChange={handleDistrictChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a district" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDistricts.map((district) => (
+                  <SelectItem key={district.value} value={district.value}>
+                    {district.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         
-        {/* Status Information */}
+        {/* Original Region Selection - keep for compatibility */}
         <div className="md:col-span-2 mt-4">
-          {selectedState && selectedDistrict && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-center">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-blue-900">
-                    Selected: {selectedDistrict}, {selectedState}
-                  </p>
-                  <p className="text-xs text-blue-700 mt-1">
-                    Real-time reservoir and weather data will be loaded for this location
-                  </p>
-                </div>
-                {loadingRainfall && (
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                )}
-              </div>
-            </div>
-          )}
+          <label htmlFor="region-select" className="block text-sm font-medium mb-2 text-muted-foreground">
+            Or select a location with flood data:
+          </label>
+          <select
+            id="region-select"
+            className="w-full p-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+            value={selectedRegion}
+            onChange={(e) => onRegionChange(e.target.value)}
+          >
+            {regions.map((region) => (
+              <option key={region.value} value={region.value}>
+                {region.label}, {region.state}
+              </option>
+            ))}
+          </select>
         </div>
         
-        {/* Risk Level Legend */}
         <div className="flex items-center justify-center md:justify-end md:col-span-2 mt-4">
           <div className="flex items-center mr-4">
-            <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+            <span className="inline-block w-3 h-3 rounded-full bg-flood-safe mr-2"></span>
             <span className="text-xs">Low Risk</span>
           </div>
           <div className="flex items-center mr-4">
-            <span className="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-2"></span>
+            <span className="inline-block w-3 h-3 rounded-full bg-flood-warning mr-2"></span>
             <span className="text-xs">Medium Risk</span>
           </div>
           <div className="flex items-center mr-4">
-            <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
+            <span className="inline-block w-3 h-3 rounded-full bg-flood-danger mr-2"></span>
             <span className="text-xs">High Risk</span>
-          </div>
-          <div className="flex items-center">
-            <span className="inline-block w-3 h-3 rounded-full bg-red-600 mr-2"></span>
-            <span className="text-xs">Severe Risk</span>
           </div>
         </div>
       </div>

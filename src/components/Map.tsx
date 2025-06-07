@@ -1,34 +1,31 @@
 
 import React from 'react';
+import { lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Navigation } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import FloodMap from './FloodMap';
+
+// We're using lazy loading to ensure Leaflet only loads in the browser
+const MapComponent = lazy(() => import('./map/Map'));
 
 const Map: React.FC<{ 
   selectedRegion: string; 
   className?: string;
   aspectRatio?: number;
-  selectedState?: string;
-  selectedDistrict?: string;
 }> = ({ 
   selectedRegion, 
   className = "",
-  aspectRatio = 16/9,
-  selectedState,
-  selectedDistrict
+  aspectRatio = 16/9
 }) => {
   return (
     <div className={`relative w-full ${className}`}>
       <AspectRatio ratio={aspectRatio} className="w-full">
-        <div className="w-full h-full">
-          <FloodMap 
-            selectedState={selectedState}
-            selectedDistrict={selectedDistrict}
-            className="w-full h-full"
-          />
-        </div>
+        <Suspense fallback={<div className="w-full h-full bg-gray-100 flex items-center justify-center rounded-lg">Loading map...</div>}>
+          <div className="w-full h-full">
+            <MapComponent selectedRegion={selectedRegion} />
+          </div>
+        </Suspense>
       </AspectRatio>
       
       <div className="absolute bottom-4 right-4 z-10">
