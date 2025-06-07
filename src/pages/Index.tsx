@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
@@ -7,7 +8,6 @@ import FloodStats from '../components/FloodStats';
 import ChartSection from '../components/ChartSection';
 import PredictionCard from '../components/PredictionCard';
 import HistoricalFloodData from '../components/HistoricalFloodData';
-import EnhancedAiFloodForecast from '../components/EnhancedAiFloodForecast';
 import { getFloodDataForRegion, fetchImdData, floodData } from '../data/floodData';
 import { useReservoirFloodData } from '../hooks/useReservoirFloodData';
 import { useToast } from '../hooks/use-toast';
@@ -19,8 +19,6 @@ import CursorAiIndicator from '../components/CursorAiIndicator';
 
 const Index = () => {
   const [selectedRegion, setSelectedRegion] = useState('mumbai');
-  const [selectedState, setSelectedState] = useState<string>('');
-  const [selectedDistrict, setSelectedDistrict] = useState<string>('');
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [nextUpdateTime, setNextUpdateTime] = useState<Date>(new Date(Date.now() + 12 * 60 * 60 * 1000));
   const [dataFreshness, setDataFreshness] = useState<'fresh' | 'stale' | 'updating'>('updating');
@@ -111,14 +109,6 @@ const Index = () => {
 
   const handleRegionChange = (region: string) => {
     setSelectedRegion(region);
-  };
-
-  const handleStateChange = (state: string) => {
-    setSelectedState(state);
-  };
-
-  const handleDistrictChange = (district: string) => {
-    setSelectedDistrict(district);
   };
   
   // Improved manual refresh handler
@@ -220,15 +210,13 @@ const Index = () => {
           </div>
         </div>
         
-        {/* Region Selector */}
+        {/* Region Selector first */}
         <RegionSelector 
           selectedRegion={selectedRegion}
           onRegionChange={handleRegionChange}
-          onStateChange={handleStateChange}
-          onDistrictChange={handleDistrictChange}
         />
         
-        {/* Map Section */}
+        {/* Map now placed between region selector and timestamps/refresh controls */}
         <div className="mb-6">
           <Map 
             selectedRegion={selectedRegion} 
@@ -298,61 +286,58 @@ const Index = () => {
           </div>
         ) : (
           <>
-            {/* Enhanced Content Layout - Improved spacing and organization */}
-            <div className="space-y-6">
-              {/* Top Row - Stats and Current Conditions */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Updated layout: content sections */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              <div className="lg:col-span-2 space-y-6">
+                {/* Left side content */}
                 <FloodStats floodData={enhancedFloodData} />
-                <div className="bg-white rounded-lg p-4 shadow-sm">
-                  <h3 className="text-lg font-semibold mb-3">Current Conditions</h3>
-                  {enhancedFloodData ? (
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>Risk Level:</span>
-                        <span className={`font-medium ${
-                          enhancedFloodData.riskLevel === 'severe' ? 'text-red-600' :
-                          enhancedFloodData.riskLevel === 'high' ? 'text-orange-600' :
-                          enhancedFloodData.riskLevel === 'medium' ? 'text-yellow-600' :
-                          'text-green-600'
-                        }`}>
-                          {enhancedFloodData.riskLevel.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Location:</span>
-                        <span className="font-medium">
-                          {selectedDistrict || selectedState || selectedRegion}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Last Updated:</span>
-                        <span className="text-sm text-muted-foreground">
-                          {lastUpdateTime.toLocaleTimeString()}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-muted-foreground">
-                      <p>No location data available</p>
-                      <p className="text-sm">Please select a state and district</p>
+                <ChartSection selectedRegion={selectedRegion} />
+                <PredictionCard floodData={enhancedFloodData} />
+              </div>
+              
+              {/* Right side content - additional info, no map here anymore */}
+              <div className="lg:col-span-1">
+                <div className="sticky top-6 bg-white p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-medium mb-2">Flood Risk Information</h2>
+                  
+                  {reservoirCount > 0 && (
+                    <div className="mb-4 p-2 bg-blue-50 rounded">
+                      <p className="text-xs text-blue-700 font-medium">
+                        ✓ Live Data Active
+                      </p>
+                      <p className="text-xs text-blue-600">
+                        Analyzing {reservoirCount} reservoir conditions in real-time
+                      </p>
+                      {reservoirLastUpdated && (
+                        <p className="text-xs text-blue-500 mt-1">
+                          Last sync: {reservoirLastUpdated.toLocaleTimeString()}
+                        </p>
+                      )}
                     </div>
                   )}
+                  
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium mb-2">Risk Levels</h3>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex items-center">
+                        <span className="w-3 h-3 bg-green-500 rounded-full mr-1"></span>
+                        <span>Low Risk</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="w-3 h-3 bg-yellow-500 rounded-full mr-1"></span>
+                        <span>Medium Risk</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="w-3 h-3 bg-orange-500 rounded-full mr-1"></span>
+                        <span>High Risk</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="w-3 h-3 bg-red-500 rounded-full mr-1"></span>
+                        <span>Severe Risk</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              {/* Middle Row - Charts and Forecast */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <ChartSection selectedRegion={selectedRegion} />
-                <EnhancedAiFloodForecast 
-                  selectedRegion={selectedRegion}
-                  selectedState={selectedState}
-                  selectedDistrict={selectedDistrict}
-                />
-              </div>
-
-              {/* Bottom Row - Prediction Card */}
-              <div className="grid grid-cols-1">
-                <PredictionCard floodData={enhancedFloodData} />
               </div>
             </div>
             
