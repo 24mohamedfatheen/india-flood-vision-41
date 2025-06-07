@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
@@ -15,11 +16,8 @@ import { Button } from '../components/ui/button';
 import { useAuth } from '../context/AuthContext';
 import { Skeleton } from '../components/ui/skeleton';
 import CursorAiIndicator from '../components/CursorAiIndicator';
-import ErrorBoundary from '../components/ErrorBoundary';
 
 const Index = () => {
-  console.log('Index component starting to render');
-  
   const [selectedRegion, setSelectedRegion] = useState('mumbai');
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [nextUpdateTime, setNextUpdateTime] = useState<Date>(new Date(Date.now() + 12 * 60 * 60 * 1000));
@@ -29,15 +27,11 @@ const Index = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentFloodData, setCurrentFloodData] = useState(floodData);
   
-  console.log('Index: Initial state set');
-  
   const { toast } = useToast();
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   
-  console.log('Index: Hooks initialized');
-  
-  // Use the reservoir flood data hook
+  // Use the new reservoir flood data hook
   const { 
     isLoading: reservoirLoading, 
     error: reservoirError, 
@@ -46,17 +40,13 @@ const Index = () => {
     reservoirCount
   } = useReservoirFloodData();
 
-  console.log('Index: Reservoir hook initialized');
-
-  // Get current region's flood data with live enhancements
-  const enhancedFloodData = updateFloodDataWithReservoirs(currentFloodData);
-  const floodDataForRegion = enhancedFloodData.find(data => data.region.toLowerCase() === selectedRegion.toLowerCase());
-
-  console.log('Index: Enhanced flood data for', selectedRegion, ':', floodDataForRegion?.riskLevel);
+  // Get current region's flood data (now enhanced with live reservoir data)
+  const floodDataForRegion = getFloodDataForRegion(selectedRegion);
+  const enhancedFloodData = floodDataForRegion ? 
+    updateFloodDataWithReservoirs([floodDataForRegion])[0] : null;
 
   // Improved data fetching function with consistency handling
   const loadFloodData = useCallback(async (forceRefresh = false) => {
-    console.log('loadFloodData called with forceRefresh:', forceRefresh);
     const currentState = forceRefresh ? 'updating' : dataFreshness;
     setDataFreshness(currentState);
     
@@ -106,13 +96,11 @@ const Index = () => {
   
   // Initial data fetch
   useEffect(() => {
-    console.log('Index: Initial data fetch effect');
     loadFloodData(false);
   }, [loadFloodData]);
 
   // Update flood data when reservoir data changes
   useEffect(() => {
-    console.log('Index: Reservoir data change effect');
     if (!reservoirLoading) {
       const updatedFloodData = updateFloodDataWithReservoirs(floodData);
       setCurrentFloodData(updatedFloodData);
@@ -120,7 +108,6 @@ const Index = () => {
   }, [reservoirLoading, updateFloodDataWithReservoirs]);
 
   const handleRegionChange = (region: string) => {
-    console.log('Region changed to:', region);
     setSelectedRegion(region);
   };
   
@@ -174,19 +161,13 @@ const Index = () => {
     return () => clearInterval(freshnessInterval);
   }, [lastUpdateTime]);
 
-  console.log('Index: About to render JSX');
-
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-4">
-          <ErrorBoundary>
-            <Header />
-          </ErrorBoundary>
+          <Header />
           <div className="flex items-center gap-2">
-            <ErrorBoundary>
-              <CursorAiIndicator />
-            </ErrorBoundary>
+            <CursorAiIndicator />
             {isAuthenticated ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
@@ -229,23 +210,19 @@ const Index = () => {
           </div>
         </div>
         
-        {/* Region Selector */}
-        <ErrorBoundary>
-          <RegionSelector 
-            selectedRegion={selectedRegion}
-            onRegionChange={handleRegionChange}
-          />
-        </ErrorBoundary>
+        {/* Region Selector first */}
+        <RegionSelector 
+          selectedRegion={selectedRegion}
+          onRegionChange={handleRegionChange}
+        />
         
-        {/* Map - removed mb-6 to reduce spacing */}
-        <div className="mb-4">
-          <ErrorBoundary>
-            <Map 
-              selectedRegion={selectedRegion} 
-              className="w-full"
-              aspectRatio={16/9}
-            />
-          </ErrorBoundary>
+        {/* Map now placed between region selector and timestamps/refresh controls */}
+        <div className="mb-6">
+          <Map 
+            selectedRegion={selectedRegion} 
+            className="w-full"
+            aspectRatio={16/9}
+          />
         </div>
         
         <div className="mb-6 flex items-center justify-between flex-wrap">
@@ -312,19 +289,13 @@ const Index = () => {
             {/* Updated layout: content sections */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
               <div className="lg:col-span-2 space-y-6">
-                {/* Left side content - use enhanced flood data */}
-                <ErrorBoundary>
-                  <FloodStats floodData={floodDataForRegion} />
-                </ErrorBoundary>
-                <ErrorBoundary>
-                  <ChartSection selectedRegion={selectedRegion} />
-                </ErrorBoundary>
-                <ErrorBoundary>
-                  <PredictionCard floodData={floodDataForRegion} />
-                </ErrorBoundary>
+                {/* Left side content */}
+                <FloodStats floodData={enhancedFloodData} />
+                <ChartSection selectedRegion={selectedRegion} />
+                <PredictionCard floodData={enhancedFloodData} />
               </div>
               
-              {/* Right side content */}
+              {/* Right side content - additional info, no map here anymore */}
               <div className="lg:col-span-1">
                 <div className="sticky top-6 bg-white p-4 rounded-lg shadow">
                   <h2 className="text-lg font-medium mb-2">Flood Risk Information</h2>
@@ -382,11 +353,7 @@ const Index = () => {
             </div>
             
             {/* Historical Flood Data Section */}
-            {showHistoricalData && (
-              <ErrorBoundary>
-                <HistoricalFloodData />
-              </ErrorBoundary>
-            )}
+            {showHistoricalData && <HistoricalFloodData />}
           </>
         )}
         
