@@ -1,8 +1,8 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { floodData, getFloodDataForRegion } from '../../data/floodData';
-import { useReservoirFloodData } from '../../hooks/useReservoirFloodData';
 import { useToast } from '../../hooks/use-toast';
 import MapControls from './MapControls';
 import MapMarker from './MapMarker';
@@ -21,12 +21,6 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
   const [lastUpdate, setLastUpdate] = useState<string>('');
   const selectedFloodData = getFloodDataForRegion(selectedRegion);
   const { toast } = useToast();
-  
-  // Get enhanced flood data with live reservoir information
-  const { updateFloodDataWithReservoirs } = useReservoirFloodData();
-  const enhancedFloodData = updateFloodDataWithReservoirs(floodData);
-
-  console.log('Map: Enhanced flood data:', enhancedFloodData.map(d => ({ region: d.region, riskLevel: d.riskLevel })));
 
   // Initialize map
   useEffect(() => {
@@ -98,7 +92,7 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
 
   }, [selectedRegion, mapLoaded, selectedFloodData]);
 
-  // Update flood areas on map using enhanced data
+  // Update flood areas on map
   const updateFloodAreas = () => {
     if (!map.current || !layersRef.current['floodAreas']) return;
     
@@ -106,8 +100,8 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
     const floodAreasLayer = layersRef.current['floodAreas'] as L.LayerGroup;
     floodAreasLayer.clearLayers();
     
-    // Use enhanced flood data instead of original floodData
-    const filteredFloodData = enhancedFloodData.filter(data => data.riskLevel !== 'low');
+    // Generate flood area features
+    const filteredFloodData = floodData.filter(data => data.riskLevel !== 'low');
     
     filteredFloodData.forEach(data => {
       const geoJsonPolygon = createFloodAreaPolygon(data);
@@ -236,8 +230,8 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
       
       <MapLegend />
       
-      {/* Render map markers with enhanced flood data */}
-      {mapLoaded && map.current && enhancedFloodData.map(data => (
+      {/* Render map markers once the map is loaded */}
+      {mapLoaded && map.current && floodData.map(data => (
         <MapMarker 
           key={data.id}
           data={data}

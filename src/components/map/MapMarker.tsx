@@ -7,36 +7,26 @@ const MapMarker = ({ data, map, selectedRegion, popupRef }: MapMarkerProps) => {
   useEffect(() => {
     if (!map) return;
 
-    // Set marker color based on risk level with proper color mapping
-    const getMarkerColor = (riskLevel: string) => {
-      switch (riskLevel) {
-        case 'severe':
-          return '#DC2626'; // Red
-        case 'high':
-          return '#EA580C'; // Orange
-        case 'medium':
-          return '#D97706'; // Amber
-        case 'low':
-        default:
-          return '#16A34A'; // Green
-      }
-    };
-
-    const color = getMarkerColor(data.riskLevel);
+    // Set marker color based on risk level
+    const color = 
+      data.riskLevel === 'severe' ? '#F44336' :
+      data.riskLevel === 'high' ? '#FF9800' :
+      data.riskLevel === 'medium' ? '#FFC107' : 
+      '#4CAF50';
     
-    // Create custom marker icon with proper color
+    // Create custom marker icon
     const customIcon = L.divIcon({
       html: `
-        <div class="flood-marker" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
-          <svg viewBox="0 0 24 24" width="28" height="28" stroke="${color}" stroke-width="2" fill="${color}" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+        <div class="flood-marker" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="${color}" stroke-width="3" fill="white" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-            <circle cx="12" cy="10" r="3" fill="white"></circle>
+            <circle cx="12" cy="10" r="3"></circle>
           </svg>
         </div>
       `,
       className: data.riskLevel === 'severe' || data.riskLevel === 'high' ? 'animate-pulse' : '',
-      iconSize: [28, 28],
-      iconAnchor: [14, 28]
+      iconSize: [24, 24],
+      iconAnchor: [12, 24]
     });
     
     // Create and add marker with correct coordinates
@@ -127,7 +117,7 @@ const MapMarker = ({ data, map, selectedRegion, popupRef }: MapMarkerProps) => {
     };
   }, [data, map, selectedRegion, popupRef]);
 
-  return null;
+  return null; // This component doesn't render anything directly
 };
 
 export default MapMarker;
