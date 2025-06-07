@@ -65,6 +65,54 @@ const cityCoordinates: Record<string, [number, number]> = {
   'Guwahati': [26.1445, 91.7362]
 };
 
+// New export functions for dynamic region selection
+export const fetchUniqueStates = async (): Promise<string[]> => {
+  try {
+    console.log('🔍 Fetching unique states from Supabase...');
+    
+    const { data, error } = await supabase
+      .from('indian_reservoir_levels')
+      .select('state')
+      .not('state', 'is', null);
+
+    if (error) {
+      console.error('Error fetching states:', error);
+      return [];
+    }
+
+    const uniqueStates = [...new Set(data?.map(row => row.state).filter(Boolean))].sort();
+    console.log('✅ Fetched unique states:', uniqueStates.length);
+    return uniqueStates;
+  } catch (error) {
+    console.error('Error fetching unique states:', error);
+    return [];
+  }
+};
+
+export const fetchDistrictsForState = async (state: string): Promise<string[]> => {
+  try {
+    console.log(`🔍 Fetching districts for state: ${state}`);
+    
+    const { data, error } = await supabase
+      .from('indian_reservoir_levels')
+      .select('district')
+      .eq('state', state)
+      .not('district', 'is', null);
+
+    if (error) {
+      console.error('Error fetching districts:', error);
+      return [];
+    }
+
+    const uniqueDistricts = [...new Set(data?.map(row => row.district).filter(Boolean))].sort();
+    console.log(`✅ Fetched districts for ${state}:`, uniqueDistricts.length);
+    return uniqueDistricts;
+  } catch (error) {
+    console.error('Error fetching districts:', error);
+    return [];
+  }
+};
+
 // Helper to get state for region (now uses the dynamic regions array)
 const getStateForRegion = (regionName: string): string => {
   const foundRegion = regions.find(r => r.value === regionName.toLowerCase());
