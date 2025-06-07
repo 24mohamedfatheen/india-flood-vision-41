@@ -206,12 +206,15 @@ const AiFloodForecast: React.FC<AiFloodForecastProps> = ({ selectedRegion }) => 
                     Highest Risk Day:
                   </span>
                   <span className="font-medium text-xs">
-                    {safeDateFormat(analysis.highestRiskDay.date, 'MMM dd')} ({analysis.highestRiskDay.probability}%)
+                    {analysis.highestRiskDay?.date ? 
+                      `${safeDateFormat(analysis.highestRiskDay.date, 'MMM dd')} (${analysis.highestRiskDay.probability}%)` : 
+                      'No data available'
+                    }
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span>Average Risk Level:</span>
-                  <span className="font-medium">{analysis.averageProbability}%</span>
+                  <span className="font-medium">{analysis.averageProbability || 'N/A'}%</span>
                 </div>
               </div>
               <div className="space-y-2">
@@ -294,7 +297,7 @@ const AiFloodForecast: React.FC<AiFloodForecastProps> = ({ selectedRegion }) => 
               </h3>
               <div className="bg-muted p-2 rounded-sm">
                 <div className="text-xs space-y-1">
-                  {data.forecasts[0].factors?.rainfall !== undefined && (
+                  {data.forecasts[0]?.factors?.rainfall !== undefined && (
                     <div className="flex justify-between">
                       <span className="flex items-center">
                         <CloudRain className="h-3 w-3 mr-1 text-blue-600" /> Rainfall:
@@ -314,7 +317,7 @@ const AiFloodForecast: React.FC<AiFloodForecastProps> = ({ selectedRegion }) => 
                     </div>
                   )}
                   
-                  {data.forecasts[0].factors?.riverLevel !== undefined && (
+                  {data.forecasts[0]?.factors?.riverLevel !== undefined && (
                     <div className="flex justify-between">
                       <span className="flex items-center">
                         <Droplet className="h-3 w-3 mr-1 text-blue-600" /> River Level:
@@ -325,7 +328,7 @@ const AiFloodForecast: React.FC<AiFloodForecastProps> = ({ selectedRegion }) => 
                     </div>
                   )}
                   
-                  {data.forecasts[0].factors?.groundSaturation !== undefined && (
+                  {data.forecasts[0]?.factors?.groundSaturation !== undefined && (
                     <div className="flex justify-between">
                       <span className="flex items-center">
                         <Wind className="h-3 w-3 mr-1 text-blue-600" /> Ground Saturation:
@@ -336,7 +339,7 @@ const AiFloodForecast: React.FC<AiFloodForecastProps> = ({ selectedRegion }) => 
                     </div>
                   )}
                   
-                  {data.forecasts[0].factors?.terrain !== undefined && (
+                  {data.forecasts[0]?.factors?.terrain !== undefined && (
                     <div className="flex justify-between">
                       <span>Terrain Impact:</span>
                       <span className="font-medium">
@@ -345,7 +348,7 @@ const AiFloodForecast: React.FC<AiFloodForecastProps> = ({ selectedRegion }) => 
                     </div>
                   )}
                   
-                  {data.forecasts[0].factors?.historicalPattern !== undefined && (
+                  {data.forecasts[0]?.factors?.historicalPattern !== undefined && (
                     <div className="flex justify-between">
                       <span>Historical Pattern:</span>
                       <span className="font-medium">
