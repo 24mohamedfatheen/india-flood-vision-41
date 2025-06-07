@@ -1,4 +1,3 @@
-
 // src/data/floodData.ts
 
 import { IMDRegionData } from '../services/imdApiService';
@@ -162,6 +161,70 @@ const CACHE_VALIDITY_DURATION = 6 * 60 * 60 * 1000;
 // Local storage key for persisting cache
 const IMD_CACHE_KEY = 'imd_data_cache';
 
+// Define specific risk levels for cities based on your comprehensive analysis
+const cityRiskMapping: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
+  // High Risk Cities
+  'mumbai': 'high',
+  'kolkata': 'high', 
+  'chennai': 'high',
+  'guwahati': 'high',
+  'patna': 'high',
+  'dibrugarh': 'high',
+  'jorhat': 'high',
+  'kokrajhar': 'high',
+  'balasore': 'high',
+  'kochi': 'high',
+  'alappuzha': 'severe', // Extremely vulnerable to floods
+  'silchar': 'high',
+  'purnia': 'high',
+  'motihari': 'high',
+  'muzaffarpur': 'high',
+  'darbhanga': 'high',
+  
+  // Medium Risk Cities
+  'delhi': 'medium',
+  'bengaluru': 'medium',
+  'hyderabad': 'medium',
+  'ahmedabad': 'medium',
+  'surat': 'medium',
+  'pune': 'medium',
+  'nagpur': 'medium',
+  'bhubaneswar': 'medium',
+  'cuttack': 'medium',
+  'vijayawada': 'medium',
+  'rajahmundry': 'medium',
+  'guntur': 'medium',
+  'thiruvananthapuram': 'medium',
+  'thrissur': 'medium',
+  'kottayam': 'medium',
+  'nashik': 'medium',
+  'kolhapur': 'medium',
+  'vadodara': 'medium',
+  'rajkot': 'medium',
+  'amritsar': 'medium',
+  'ludhiana': 'medium',
+  'jalandhar': 'medium',
+  'roorkee': 'medium',
+  'haridwar': 'medium',
+  'dehradun': 'medium',
+  'bihar sharif': 'medium',
+  'bhagalpur': 'medium',
+  
+  // Low Risk Cities
+  'jaipur': 'low',
+  'lucknow': 'low',
+  'kanpur': 'low',
+  'indore': 'low',
+  'agra': 'low',
+  'allahabad': 'low',
+  'gorakhpur': 'low',
+  'bareilly': 'low',
+  'varanasi': 'low',
+  'gaya': 'low',
+  'shimla': 'low',
+  'srinagar': 'low'
+};
+
 // Helper function to map IMDRegionData to FloodData
 const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
   const currentYear = new Date().getFullYear();
@@ -211,34 +274,16 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
 
 // Create diverse static fallback data with specific high-risk cities
 const createDiverseStaticData = (): FloodData[] => {
-  // Define specific cities with their intended risk levels
-  const cityRiskMapping: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
-    'mumbai': 'severe',
-    'chennai': 'severe', 
-    'kolkata': 'high',
-    'delhi': 'high',
-    'patna': 'high',
-    'guwahati': 'high',
-    'kochi': 'medium',
-    'pune': 'medium',
-    'hyderabad': 'medium',
-    'bengaluru': 'medium',
-    'ahmedabad': 'low',
-    'jaipur': 'low',
-    'surat': 'low'
-  };
-  
   return regions.map((r, index) => {
-    // Get risk level from mapping, or assign cyclically for unmapped cities
-    const riskLevel = cityRiskMapping[r.value.toLowerCase()] || 
-      (['low', 'medium', 'high', 'severe'] as const)[index % 4];
+    // Get risk level from comprehensive mapping
+    const riskLevel = cityRiskMapping[r.value.toLowerCase()] || 'medium';
     
     // Set affected area and population based on risk level
     const riskMultipliers = {
-      'low': { area: 15, population: 8000 },
-      'medium': { area: 75, population: 45000 },
-      'high': { area: 200, population: 150000 },
-      'severe': { area: 400, population: 750000 }
+      'low': { area: 15, population: 8000, rainfall: 25 },
+      'medium': { area: 75, population: 45000, rainfall: 75 },
+      'high': { area: 200, population: 150000, rainfall: 120 },
+      'severe': { area: 400, population: 750000, rainfall: 180 }
     };
     
     const multiplier = riskMultipliers[riskLevel];
@@ -255,7 +300,7 @@ const createDiverseStaticData = (): FloodData[] => {
       populationAffected: multiplier.population,
       coordinates,
       timestamp: new Date().toISOString(),
-      currentRainfall: riskLevel === 'severe' ? 180 : riskLevel === 'high' ? 120 : riskLevel === 'medium' ? 75 : 25,
+      currentRainfall: multiplier.rainfall,
       historicalRainfallData: [],
       predictionAccuracy: 75,
       estimatedDamage: { 
