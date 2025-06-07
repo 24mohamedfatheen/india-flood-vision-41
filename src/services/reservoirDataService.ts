@@ -1,4 +1,3 @@
-
 import { supabase } from '../integrations/supabase/client';
 
 export interface ReservoirData {
@@ -14,6 +13,7 @@ export interface ReservoirData {
   last_updated?: string;
   lat?: number;
   long?: number;
+  full_reservoir_level?: number; // Added missing property
 }
 
 export interface FloodRiskCalculation {
@@ -82,7 +82,7 @@ export const fetchReservoirData = async (): Promise<ReservoirData[]> => {
         // Now fetch more data from the working table
         const { data: fullData, error: fullError } = await supabase
           .from('indian_reservoir_levels')
-          .select('id, reservoir_name, state, district, current_level_mcm, capacity_mcm, percentage_full, inflow_cusecs, outflow_cusecs, last_updated, lat, long')
+          .select('id, reservoir_name, state, district, current_level_mcm, capacity_mcm, percentage_full, inflow_cusecs, outflow_cusecs, last_updated, lat, long, full_reservoir_level')
           .limit(100);
 
         if (fullError) {
