@@ -1,3 +1,4 @@
+
 // src/data/floodData.ts
 
 import { IMDRegionData } from '../services/imdApiService';
@@ -208,20 +209,36 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
   return mappedData;
 };
 
-// Create diverse static fallback data with different risk levels
+// Create diverse static fallback data with specific high-risk cities
 const createDiverseStaticData = (): FloodData[] => {
-  const riskLevels: ('low' | 'medium' | 'high' | 'severe')[] = ['low', 'medium', 'high', 'severe'];
+  // Define specific cities with their intended risk levels
+  const cityRiskMapping: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
+    'mumbai': 'severe',
+    'chennai': 'severe', 
+    'kolkata': 'high',
+    'delhi': 'high',
+    'patna': 'high',
+    'guwahati': 'high',
+    'kochi': 'medium',
+    'pune': 'medium',
+    'hyderabad': 'medium',
+    'bengaluru': 'medium',
+    'ahmedabad': 'low',
+    'jaipur': 'low',
+    'surat': 'low'
+  };
   
   return regions.map((r, index) => {
-    // Assign risk levels in a pattern to ensure variety
-    const riskLevel = riskLevels[index % riskLevels.length];
+    // Get risk level from mapping, or assign cyclically for unmapped cities
+    const riskLevel = cityRiskMapping[r.value.toLowerCase()] || 
+      (['low', 'medium', 'high', 'severe'] as const)[index % 4];
     
     // Set affected area and population based on risk level
     const riskMultipliers = {
-      'low': { area: 10, population: 5000 },
-      'medium': { area: 50, population: 25000 },
-      'high': { area: 150, population: 100000 },
-      'severe': { area: 300, population: 500000 }
+      'low': { area: 15, population: 8000 },
+      'medium': { area: 75, population: 45000 },
+      'high': { area: 200, population: 150000 },
+      'severe': { area: 400, population: 750000 }
     };
     
     const multiplier = riskMultipliers[riskLevel];
@@ -238,10 +255,14 @@ const createDiverseStaticData = (): FloodData[] => {
       populationAffected: multiplier.population,
       coordinates,
       timestamp: new Date().toISOString(),
-      currentRainfall: riskLevel === 'severe' ? 150 : riskLevel === 'high' ? 100 : riskLevel === 'medium' ? 60 : 20,
+      currentRainfall: riskLevel === 'severe' ? 180 : riskLevel === 'high' ? 120 : riskLevel === 'medium' ? 75 : 25,
       historicalRainfallData: [],
-      predictionAccuracy: 70,
-      estimatedDamage: { crops: 0, properties: 0, infrastructure: 0 }
+      predictionAccuracy: 75,
+      estimatedDamage: { 
+        crops: multiplier.area * 1000, 
+        properties: multiplier.population * 50, 
+        infrastructure: multiplier.area * 5000 
+      }
     };
   });
 };
