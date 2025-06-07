@@ -5,7 +5,7 @@ import { imdApiService } from '../services/imdApiService'; // Import the live AP
 import { staticHistoricalRainfallData } from './staticHistoricalRainfallData'; // Import the new static historical data
 import { parseCsv } from '../utils/csvParser'; // Import the CSV parser
 
-// Hardcoded content of weather.csv for direct use in the browser environment
+// Updated hardcoded content with all the new flood-prone locations
 const WEATHER_CSV_CONTENT = `
 ,city,lat,lng,country,iso2,admin_name,capital,population,population_proper
 0,Mumbai,19.076,72.8777,India,IN,Maharashtra,admin,20000000,12442373
@@ -25,6 +25,44 @@ const WEATHER_CSV_CONTENT = `
 14,Indore,22.7167,75.8472,India,IN,Madhya Pradesh,,2400000,1964086
 15,Kochi,9.9667,76.2833,India,IN,Kerala,,2300000,602046
 16,Guwahati,26.1833,91.75,India,IN,Assam,,1100000,962334
+17,Agra,27.1767,78.0078,India,IN,Uttar Pradesh,,1500000,1500000
+18,Allahabad,25.4358,81.8463,India,IN,Uttar Pradesh,,1200000,1200000
+19,Gorakhpur,26.76,83.3731,India,IN,Uttar Pradesh,,800000,800000
+20,Bareilly,28.367,79.4304,India,IN,Uttar Pradesh,,900000,900000
+21,Varanasi,25.3176,82.9739,India,IN,Uttar Pradesh,,1200000,1200000
+22,Gaya,24.7978,85.0098,India,IN,Bihar,,500000,500000
+23,Purnia,25.7877,87.4764,India,IN,Bihar,,300000,300000
+24,Motihari,26.6575,84.9192,India,IN,Bihar,,250000,250000
+25,Dibrugarh,27.4883,94.9048,India,IN,Assam,,150000,150000
+26,Jorhat,26.7441,94.2166,India,IN,Assam,,200000,200000
+27,Kokrajhar,26.4069,90.2743,India,IN,Assam,,100000,100000
+28,Bhubaneswar,20.2961,85.8245,India,IN,Odisha,admin,850000,850000
+29,Cuttack,20.463,85.8829,India,IN,Odisha,,650000,650000
+30,Balasore,21.4939,86.94,India,IN,Odisha,,150000,150000
+31,Vijayawada,16.5062,80.648,India,IN,Andhra Pradesh,,1000000,1000000
+32,Rajahmundry,16.9918,81.7766,India,IN,Andhra Pradesh,,350000,350000
+33,Guntur,16.3,80.45,India,IN,Andhra Pradesh,,750000,750000
+34,Thiruvananthapuram,8.5241,76.9366,India,IN,Kerala,admin,950000,950000
+35,Thrissur,10.5276,76.2144,India,IN,Kerala,,315000,315000
+36,Kottayam,9.5916,76.5222,India,IN,Kerala,,200000,200000
+37,Nashik,20.0,73.78,India,IN,Maharashtra,,1500000,1500000
+38,Kolhapur,16.705,74.2433,India,IN,Maharashtra,,550000,550000
+39,Vadodara,22.3072,73.1812,India,IN,Gujarat,,1700000,1700000
+40,Rajkot,22.2958,70.7984,India,IN,Gujarat,,1300000,1300000
+41,Amritsar,31.634,74.8723,India,IN,Punjab,,1200000,1200000
+42,Ludhiana,30.901,75.8573,India,IN,Punjab,,1600000,1600000
+43,Jalandhar,31.326,75.5762,India,IN,Punjab,,900000,900000
+44,Roorkee,29.87,77.89,India,IN,Uttarakhand,,120000,120000
+45,Haridwar,29.9457,78.1642,India,IN,Uttarakhand,,230000,230000
+46,Shimla,31.1048,77.1734,India,IN,Himachal Pradesh,admin,170000,170000
+47,Bihar Sharif,25.2,85.5,India,IN,Bihar,,300000,300000
+48,Bhagalpur,25.2427,86.9859,India,IN,Bihar,,410000,410000
+49,Silchar,24.8219,92.7769,India,IN,Assam,,185000,185000
+50,Muzaffarpur,26.1226,85.3916,India,IN,Bihar,,390000,390000
+51,Darbhanga,26.1555,85.9001,India,IN,Bihar,,300000,300000
+52,Alappuzha,9.4981,76.3388,India,IN,Kerala,,174000,174000
+53,Dehradun,30.3165,78.0322,India,IN,Uttarakhand,admin,580000,580000
+54,Srinagar,34.0837,74.7973,India,IN,Jammu and Kashmir,admin,1200000,1200000
 `;
 
 // Define an interface for the parsed CSV data

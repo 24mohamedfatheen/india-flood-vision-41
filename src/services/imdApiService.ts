@@ -62,7 +62,46 @@ const cityCoordinates: Record<string, [number, number]> = {
   'Patna': [25.5941, 85.1417],
   'Indore': [22.7167, 75.8472],
   'Kochi': [9.9312, 76.2600],
-  'Guwahati': [26.1445, 91.7362]
+  'Guwahati': [26.1445, 91.7362],
+  // New locations
+  'Agra': [27.1767, 78.0078],
+  'Allahabad': [25.4358, 81.8463],
+  'Gorakhpur': [26.7600, 83.3731],
+  'Bareilly': [28.3670, 79.4304],
+  'Varanasi': [25.3176, 82.9739],
+  'Gaya': [24.7978, 85.0098],
+  'Purnia': [25.7877, 87.4764],
+  'Motihari': [26.6575, 84.9192],
+  'Dibrugarh': [27.4883, 94.9048],
+  'Jorhat': [26.7441, 94.2166],
+  'Kokrajhar': [26.4069, 90.2743],
+  'Bhubaneswar': [20.2961, 85.8245],
+  'Cuttack': [20.4630, 85.8829],
+  'Balasore': [21.4939, 86.9400],
+  'Vijayawada': [16.5062, 80.6480],
+  'Rajahmundry': [16.9918, 81.7766],
+  'Guntur': [16.3000, 80.4500],
+  'Thiruvananthapuram': [8.5241, 76.9366],
+  'Thrissur': [10.5276, 76.2144],
+  'Kottayam': [9.5916, 76.5222],
+  'Nashik': [20.0000, 73.7800],
+  'Kolhapur': [16.7050, 74.2433],
+  'Vadodara': [22.3072, 73.1812],
+  'Rajkot': [22.2958, 70.7984],
+  'Amritsar': [31.6340, 74.8723],
+  'Ludhiana': [30.9010, 75.8573],
+  'Jalandhar': [31.3260, 75.5762],
+  'Roorkee': [29.8700, 77.8900],
+  'Haridwar': [29.9457, 78.1642],
+  'Shimla': [31.1048, 77.1734],
+  'Bihar Sharif': [25.2000, 85.5000],
+  'Bhagalpur': [25.2427, 86.9859],
+  'Silchar': [24.8219, 92.7769],
+  'Muzaffarpur': [26.1226, 85.3916],
+  'Darbhanga': [26.1555, 85.9001],
+  'Alappuzha': [9.4981, 76.3388],
+  'Dehradun': [30.3165, 78.0322],
+  'Srinagar': [34.0837, 74.7973]
 };
 
 // Helper to get state for region (now uses the dynamic regions array)
@@ -179,12 +218,14 @@ export const imdApiService = {
           regionDataMap.set(lowerRegionName, regionEntry);
         }
 
-        // Strict percentage_full Sanitization (No Anomalies)
+        // Updated risk thresholds based on actual data values shown in the image
+        // The data shows values like 623.28, 747.7, 422.76, etc. which are much higher than previous thresholds
         const rawPercentageFull = res.percentage_full;
         const percentageFull = Math.min(100, Math.max(0, parseFloat(String(rawPercentageFull)) || 0));
         
         const inflowCusecs = res.inflow_cusecs || 0;
         const outflowCusecs = res.outflow_cusecs || 0;
+        const currentLevel = res.current_level_mcm || 0;
 
         // Update region data with highest percentage and sum inflows
         if (percentageFull > regionEntry.reservoirPercentage) {
@@ -192,13 +233,16 @@ export const imdApiService = {
         }
         regionEntry.inflowCusecs += inflowCusecs;
 
-        // Aggressive & Strictly Derived Risk Thresholds (No Randomness)
+        // Updated Risk Level Calculation based on actual reservoir levels
+        // Based on the image data showing levels in hundreds (422-747 range)
         let riskLevel: IMDRegionData['floodRiskLevel'] = 'low';
-        if (regionEntry.reservoirPercentage >= 50 || regionEntry.inflowCusecs >= 1000) {
+        
+        // Use current level (MCM) for risk assessment as it shows actual water levels
+        if (currentLevel >= 600 || regionEntry.reservoirPercentage >= 80 || regionEntry.inflowCusecs >= 5000) {
           riskLevel = 'severe';
-        } else if (regionEntry.reservoirPercentage >= 30 || regionEntry.inflowCusecs >= 100) {
+        } else if (currentLevel >= 400 || regionEntry.reservoirPercentage >= 60 || regionEntry.inflowCusecs >= 2000) {
           riskLevel = 'high';
-        } else if (regionEntry.reservoirPercentage >= 5 || regionEntry.inflowCusecs >= 10) {
+        } else if (currentLevel >= 200 || regionEntry.reservoirPercentage >= 40 || regionEntry.inflowCusecs >= 500) {
           riskLevel = 'medium';
         }
         
@@ -217,9 +261,9 @@ export const imdApiService = {
             regionEntry.riverData = {
               name: res.reservoir_name,
               currentLevel: res.current_level_mcm || 0,
-              dangerLevel: res.capacity_mcm ? res.capacity_mcm * 0.95 : 7.5,
-              warningLevel: res.capacity_mcm ? res.capacity_mcm * 0.85 : 6.0,
-              normalLevel: res.capacity_mcm ? res.capacity_mcm * 0.5 : 3.5,
+              dangerLevel: res.capacity_mcm ? res.capacity_mcm * 0.95 : 800, // Updated based on data scale
+              warningLevel: res.capacity_mcm ? res.capacity_mcm * 0.85 : 650, // Updated based on data scale
+              normalLevel: res.capacity_mcm ? res.capacity_mcm * 0.5 : 350, // Updated based on data scale
               trend: (inflowCusecs > outflowCusecs) ? 'rising' : (outflowCusecs > inflowCusecs ? 'falling' : 'stable'),
               lastUpdated: res.last_updated || new Date().toISOString()
             };
