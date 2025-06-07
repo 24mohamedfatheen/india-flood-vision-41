@@ -37,7 +37,7 @@ const Index = () => {
   
   console.log('Index: Hooks initialized');
   
-  // Use the new reservoir flood data hook
+  // Use the reservoir flood data hook
   const { 
     isLoading: reservoirLoading, 
     error: reservoirError, 
@@ -48,12 +48,11 @@ const Index = () => {
 
   console.log('Index: Reservoir hook initialized');
 
-  // Get current region's flood data (now enhanced with live reservoir data)
-  const floodDataForRegion = getFloodDataForRegion(selectedRegion);
-  const enhancedFloodData = floodDataForRegion ? 
-    updateFloodDataWithReservoirs([floodDataForRegion])[0] : null;
+  // Get current region's flood data with live enhancements
+  const enhancedFloodData = updateFloodDataWithReservoirs(currentFloodData);
+  const floodDataForRegion = enhancedFloodData.find(data => data.region.toLowerCase() === selectedRegion.toLowerCase());
 
-  console.log('Index: Flood data processed');
+  console.log('Index: Enhanced flood data for', selectedRegion, ':', floodDataForRegion?.riskLevel);
 
   // Improved data fetching function with consistency handling
   const loadFloodData = useCallback(async (forceRefresh = false) => {
@@ -313,15 +312,15 @@ const Index = () => {
             {/* Updated layout: content sections */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
               <div className="lg:col-span-2 space-y-6">
-                {/* Left side content */}
+                {/* Left side content - use enhanced flood data */}
                 <ErrorBoundary>
-                  <FloodStats floodData={enhancedFloodData} />
+                  <FloodStats floodData={floodDataForRegion} />
                 </ErrorBoundary>
                 <ErrorBoundary>
                   <ChartSection selectedRegion={selectedRegion} />
                 </ErrorBoundary>
                 <ErrorBoundary>
-                  <PredictionCard floodData={enhancedFloodData} />
+                  <PredictionCard floodData={floodDataForRegion} />
                 </ErrorBoundary>
               </div>
               
