@@ -1,4 +1,3 @@
-
 import { getHistoricalRainfallData } from "../data/floodData";
 import { fetchWeatherDataFromIMD, fetchRiverLevelsFromCWC } from "./dataSourcesService";
 
@@ -33,8 +32,6 @@ export interface ForecastDay {
   expectedRainfall?: number;
   riverLevelChange?: number;
   factors?: FloodProbabilityFactors;
-  riskLevel: 'low' | 'medium' | 'high' | 'severe';
-  riskColor: string;
 }
 
 export interface CursorAiResponse {
@@ -52,113 +49,30 @@ export interface CursorAiResponse {
     weather?: {
       source: string;
       lastUpdated: string;
-      dataFetched: boolean;
     };
     rivers?: {
       source: string;
       lastUpdated: string;
-      dataFetched: boolean;
     };
-  };
-  summary?: {
-    averageRisk: string;
-    peakRiskDay: string;
-    trend: string;
-    sustainedHighRisk: string;
   };
 }
 
 /**
- * Enhanced seasonal coefficient for India's monsoon pattern
- * June-September: Peak monsoon (1.8-2.2)
- * October-November: Post-monsoon (1.2-1.4)
- * December-February: Winter/dry (0.3-0.5)
- * March-May: Pre-monsoon/summer (0.6-1.0)
- */
-const getSeasonalCoefficient = (month: number): number => {
-  const seasonalMap = [
-    0.4,  // Jan - Winter (dry)
-    0.3,  // Feb - Winter (driest)
-    0.6,  // Mar - Pre-monsoon
-    0.8,  // Apr - Pre-monsoon
-    1.0,  // May - Pre-monsoon (heat builds up)
-    1.8,  // Jun - Monsoon onset
-    2.2,  // Jul - Peak monsoon
-    2.1,  // Aug - Peak monsoon
-    1.9,  // Sep - Late monsoon
-    1.4,  // Oct - Post-monsoon
-    1.2,  // Nov - Post-monsoon
-    0.5   // Dec - Winter
-  ];
-  return seasonalMap[month];
-};
-
-/**
- * Dynamic terrain factor based on region characteristics
- */
-const getTerrainFactor = (region: string): number => {
-  const lowerRegion = region.toLowerCase();
-  
-  // Coastal and delta regions (high flood risk)
-  if (lowerRegion.includes('mumbai') || lowerRegion.includes('chennai') || 
-      lowerRegion.includes('kolkata') || lowerRegion.includes('kochi') ||
-      lowerRegion.includes('bhubaneswar') || lowerRegion.includes('cuttack') ||
-      lowerRegion.includes('delta') || lowerRegion.includes('coastal')) {
-    return 25;
-  }
-  
-  // Himalayan foothills and hilly regions (flash flood risk)
-  if (lowerRegion.includes('himalaya') || lowerRegion.includes('ghat') || 
-      lowerRegion.includes('shimla') || lowerRegion.includes('dehradun') ||
-      lowerRegion.includes('haridwar') || lowerRegion.includes('roorkee')) {
-    return 20;
-  }
-  
-  // River basin areas (moderate to high risk)
-  if (lowerRegion.includes('ganga') || lowerRegion.includes('yamuna') ||
-      lowerRegion.includes('brahmaputra') || lowerRegion.includes('godavari') ||
-      lowerRegion.includes('allahabad') || lowerRegion.includes('varanasi') ||
-      lowerRegion.includes('patna') || lowerRegion.includes('bihar')) {
-    return 18;
-  }
-  
-  // Plains and urban areas (moderate risk)
-  if (lowerRegion.includes('delhi') || lowerRegion.includes('pune') ||
-      lowerRegion.includes('ahmedabad') || lowerRegion.includes('surat')) {
-    return 12;
-  }
-  
-  // Default for other regions
-  return 10;
-};
-
-/**
- * Dynamic historical pattern factor based on region's flood history
- */
-const getHistoricalPatternFactor = (region: string, averageRainfall: number): number => {
-  const lowerRegion = region.toLowerCase();
-  let baseFactor = 5;
-  
-  // Known flood-prone states/regions get higher base factor
-  if (lowerRegion.includes('assam') || lowerRegion.includes('bihar') || 
-      lowerRegion.includes('kerala') || lowerRegion.includes('odisha') ||
-      lowerRegion.includes('west bengal') || lowerRegion.includes('uttar pradesh')) {
-    baseFactor = 20;
-  } else if (lowerRegion.includes('maharashtra') || lowerRegion.includes('gujarat') ||
-             lowerRegion.includes('andhra pradesh') || lowerRegion.includes('karnataka')) {
-    baseFactor = 15;
-  }
-  
-  // Boost factor based on historical rainfall data
-  if (averageRainfall > 300) baseFactor += 15;
-  else if (averageRainfall > 200) baseFactor += 10;
-  else if (averageRainfall > 100) baseFactor += 5;
-  
-  return Math.min(baseFactor, 35); // Cap at 35
-};
-
-/**
- * Enhanced core forecasting logic with improved factors and realistic calculations
+ * Core forecasting logic - converts input data into flood probability forecasts
+ * 
+ * NOTE: This is the module that would be replaced with an AI/ML model in the future.
+ * The current implementation uses a rules-based approach based on weighted factors.
+ * 
+ * Expected inputs:
+ * - Historical and recent rainfall data
+ * - Current and projected river levels
+ * - Ground saturation estimates
+ * - Historical flood patterns
+ * 
+ * Expected outputs:
+ * - Daily flood probability scores (0-100)
+ * - Confidence levels for each prediction
+ * - Contributing factors with their weights
  */
 function calculateFloodProbability(
   region: string,
@@ -168,109 +82,80 @@ function calculateFloodProbability(
   riverData?: any,
   dayIndex: number = 0
 ): ForecastDay {
-  console.log(`🔮 Calculating flood probability for ${region} on ${date.toDateString()}, Day ${dayIndex + 1}`);
+  // Base probability calculation
+  // In a real system, this would use multiple weighted factors and potentially ML models
   
+  // Get the month for seasonal adjustments
   const month = date.getMonth();
-  const seasonalCoefficient = getSeasonalCoefficient(month);
+  const seasonalCoefficient = [1.2, 1.1, 0.9, 0.8, 0.7, 0.5, 0.4, 0.6, 0.8, 1.0, 1.1, 1.3][month];
   
-  // Calculate average historical rainfall with safety check
-  const averageRainfall = historicalData.length > 0 ? 
-    historicalData.reduce((sum, item) => sum + (item.rainfall || 0), 0) / historicalData.length : 50;
+  // Calculate average historical rainfall for context
+  const averageRainfall = historicalData.reduce((sum, item) => sum + item.rainfall, 0) / historicalData.length;
   
-  console.log(`📊 Historical average rainfall for ${region}: ${averageRainfall.toFixed(1)}mm`);
+  // Base probability is influenced by expected rainfall compared to historical average
+  let baseRainfallFactor = (rainfall / (averageRainfall * 1.5)) * 100;
   
-  // Enhanced base rainfall factor with safety checks
-  let baseRainfallFactor = 0;
-  if (averageRainfall > 0) {
-    const rainfallRatio = rainfall / (averageRainfall * 1.2); // Slightly lower threshold
-    baseRainfallFactor = Math.min(100, Math.max(0, rainfallRatio * 100));
-  } else {
-    baseRainfallFactor = Math.min(100, rainfall * 0.5); // Fallback calculation
-  }
-  
-  // Enhanced river factor
+  // River level impact (if data available)
   let riverFactor = 0;
   if (riverData) {
+    // Higher factor when river level approaches danger level
     const riverRatio = riverData.currentLevel / riverData.dangerLevel;
-    riverFactor = riverRatio * 35; // Increased max contribution
+    riverFactor = riverRatio * 30; // Maximum 30% contribution
     
+    // Additional boost if river is already rising
     if (riverData.trend === 'rising') {
-      riverFactor *= 1.3;
-    } else if (riverData.trend === 'falling') {
-      riverFactor *= 0.8;
+      riverFactor *= 1.2;
     }
-    
-    console.log(`🌊 River ${riverData.riverName}: ${riverData.currentLevel}m/${riverData.dangerLevel}m (${riverData.trend})`);
   }
   
-  // Enhanced ground saturation with day accumulation effect
-  const dailyAccumulation = dayIndex * 0.1; // Builds up over days
-  let groundSaturationFactor = (baseRainfallFactor * 0.2) + (rainfall * 0.02) + dailyAccumulation;
-  groundSaturationFactor = Math.min(30, groundSaturationFactor); // Cap at 30
+  // Ground saturation estimate (simplified)
+  const groundSaturationFactor = baseRainfallFactor * 0.3;
   
-  // Dynamic factors
-  const terrainFactor = getTerrainFactor(region);
-  const historicalPatternFactor = getHistoricalPatternFactor(region, averageRainfall);
+  // Historical pattern adjustment (e.g., areas with frequent flooding)
+  const historicalPatternFactor = averageRainfall > 200 ? 15 : 5;
   
-  console.log(`🏔️ Terrain factor for ${region}: ${terrainFactor}`);
-  console.log(`📚 Historical pattern factor: ${historicalPatternFactor}`);
+  // Terrain impact (mock data - would come from elevation/topography data)
+  const terrainFactor = 10;
   
-  // Calculate total probability with refined weights
+  // Calculate total probability with all factors
   let probability = (
-    baseRainfallFactor * 0.35 + // 35% weight to current rainfall
-    riverFactor * 0.25 +        // 25% weight to river conditions
-    groundSaturationFactor * 0.15 + // 15% weight to ground saturation
-    historicalPatternFactor * 0.15 + // 15% weight to historical patterns
-    terrainFactor * 0.10         // 10% weight to terrain
+    baseRainfallFactor * 0.4 + // 40% weight to rainfall
+    riverFactor * 0.3 +        // 30% weight to river conditions
+    groundSaturationFactor +   // Ground saturation
+    historicalPatternFactor +  // Historical patterns
+    terrainFactor              // Terrain
   );
   
   // Apply seasonal coefficient
   probability *= seasonalCoefficient;
   
-  // Add temporal variability (more uncertainty for distant days)
-  const variabilityFactor = 1 + (dayIndex * 0.03);
-  const randomFactor = (Math.sin(dayIndex * 0.7) * 3) + (Math.random() * 4 - 2);
+  // Variability increases with forecast distance
+  const variabilityFactor = 1 + (dayIndex * 0.05);
   
+  // Add some randomness but ensure trend consistency
+  const randomFactor = (Math.sin(dayIndex * 0.5) * 5) + (Math.random() * 5 - 2.5);
+  
+  // Adjust probability with variability and randomness
   probability = probability * variabilityFactor + randomFactor;
   
-  // Ensure probability is within realistic bounds
+  // Ensure probability is between 5 and 95
   probability = Math.min(95, Math.max(5, probability));
   
-  // Calculate confidence (decreases with forecast distance)
-  const confidence = Math.max(60, Math.floor(95 - (dayIndex * 4)));
+  // Calculate confidence (decreases with time)
+  const confidence = Math.floor(95 - (dayIndex * 5));
   
-  // Determine risk level and color
-  let riskLevel: 'low' | 'medium' | 'high' | 'severe';
-  let riskColor: string;
+  // Expected rainfall calculation based on probability and historical data
+  const expectedRainfall = (probability / 100) * averageRainfall * 1.5;
   
-  if (probability >= 70) {
-    riskLevel = 'severe';
-    riskColor = '#ef4444'; // Red
-  } else if (probability >= 50) {
-    riskLevel = 'high';
-    riskColor = '#f97316'; // Orange
-  } else if (probability >= 30) {
-    riskLevel = 'medium';
-    riskColor = '#eab308'; // Yellow
-  } else {
-    riskLevel = 'low';
-    riskColor = '#22c55e'; // Green
-  }
-  
-  // Calculate expected rainfall and river level change
-  const expectedRainfall = (probability / 100) * averageRainfall * 1.8;
-  const riverLevelChange = riverData ? (probability / 100) * 1.5 : 0;
-  
-  console.log(`📈 Final probability for ${region} day ${dayIndex + 1}: ${probability.toFixed(1)}% (${riskLevel})`);
+  // River level change estimate
+  const riverLevelChange = (probability / 100) * 2;
   
   return {
     date: date.toISOString().split('T')[0],
     probability: Number(probability.toFixed(1)),
-    confidence,
+    confidence: confidence,
     expectedRainfall: Number(expectedRainfall.toFixed(1)),
     riverLevelChange: Number(riverLevelChange.toFixed(2)),
-    riskLevel,
-    riskColor,
     factors: {
       rainfall: Number(baseRainfallFactor.toFixed(1)),
       riverLevel: riverData ? Number(riverFactor.toFixed(1)) : undefined,
@@ -282,173 +167,112 @@ function calculateFloodProbability(
 }
 
 /**
- * Enhanced flood forecast with better error handling and logging
+ * Fetch flood forecast for a specific region
+ * Uses a combination of historical data, current conditions, and predictive models
  */
 export async function fetchFloodForecast(params: ForecastParams): Promise<CursorAiResponse> {
   const { region, state, days = 10, coordinates, useHistoricalData = true } = params;
   
-  console.log('🚀 Starting flood forecast generation...');
-  console.log(`📍 Region: ${region}, State: ${state || 'Not specified'}`);
-  console.log(`📅 Forecast days: ${days}, Use historical data: ${useHistoricalData}`);
-  
   try {
-    // Simulate API call with realistic delay
-    await new Promise(resolve => setTimeout(resolve, 1200));
+    console.log('Fetching flood forecast for:', region);
     
-    // 1. Get historical rainfall data
-    console.log('📊 Fetching historical rainfall data...');
+    // Simulate API call with a delay
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // 1. Get historical rainfall data for this region
     const currentYear = new Date().getFullYear();
     const historicalData = getHistoricalRainfallData(region, currentYear);
-    console.log(`✅ Historical data loaded: ${historicalData.length} records`);
     
-    // 2. Fetch current weather data from IMD API
+    // 2. Fetch current weather data from IMD API (simulated)
     let weatherData = null;
-    let weatherDataFetched = false;
+    let riverData = null;
     
-    console.log('🌤️ Attempting to fetch live weather data...');
     try {
       if (coordinates) {
         weatherData = await fetchWeatherDataFromIMD(region, coordinates);
-        weatherDataFetched = true;
-        console.log('✅ Live weather data fetched successfully');
-      } else {
-        console.log('⚠️ No coordinates provided, skipping weather API call');
       }
-    } catch (error) {
-      console.warn('⚠️ Failed to fetch live weather data, using simulation:', error);
-      weatherDataFetched = false;
-    }
-    
-    // 3. Fetch river level data
-    let riverData = null;
-    let riverDataFetched = false;
-    
-    console.log('🏞️ Attempting to fetch river level data...');
-    try {
+      
+      // 3. Fetch river level data if available (simulated)
       if (state) {
         riverData = await fetchRiverLevelsFromCWC(region, state);
-        riverDataFetched = true;
-        console.log('✅ River level data fetched successfully');
-      } else {
-        console.log('⚠️ No state provided, skipping river data fetch');
       }
     } catch (error) {
-      console.warn('⚠️ Failed to fetch river data, using simulation:', error);
-      riverDataFetched = false;
+      console.warn('Error fetching external data, using fallback data:', error);
+      // Continue with historical data only
     }
     
-    // 4. Generate forecast using enhanced algorithm
-    console.log('🔮 Generating flood probability forecasts...');
+    // 4. Generate forecast using all available data
     const currentDate = new Date();
     const forecasts = Array.from({ length: days }, (_, index) => {
       const forecastDate = new Date(currentDate);
       forecastDate.setDate(forecastDate.getDate() + index);
       
-      const dailyRainfall = weatherData?.rainfall || 
-        (Math.floor(Math.random() * 120) + 30 + (index * 5)); // Slight increase over time
-      
+      // Use the core forecasting algorithm to calculate flood probability
       return calculateFloodProbability(
         region,
         forecastDate,
-        dailyRainfall,
+        weatherData?.rainfall || Math.floor(Math.random() * 100) + 50,
         historicalData,
         riverData,
         index
       );
     });
     
-    console.log('✅ Forecast generation completed');
-    
-    // 5. Generate enhanced analysis
-    const analysis = analyzeForecastData({ forecasts } as CursorAiResponse);
-    
-    const response: CursorAiResponse = {
+    return {
       forecasts,
       timestamp: new Date().toISOString(),
       modelInfo: {
-        version: "enhanced-flood-forecast-v2.0",
-        accuracy: 89,
-        source: "Hybrid Rules-Based Model (Placeholder for AI/ML)",
+        version: "flood-forecast-v1.2",
+        accuracy: 87,
+        source: "Weather Data Analysis",
         lastUpdated: new Date().toISOString()
       },
       region,
       state,
       dataSourceInfo: {
         weather: {
-          source: weatherDataFetched ? "India Meteorological Department (IMD)" : "Simulated Weather Data",
-          lastUpdated: new Date().toISOString(),
-          dataFetched: weatherDataFetched
+          source: weatherData ? "India Meteorological Department (IMD)" : "Historical Data",
+          lastUpdated: new Date().toISOString()
         },
-        rivers: riverDataFetched ? {
+        rivers: riverData ? {
           source: "Central Water Commission (CWC)",
-          lastUpdated: new Date().toISOString(),
-          dataFetched: riverDataFetched
+          lastUpdated: new Date().toISOString()
         } : undefined
-      },
-      summary: analysis
+      }
     };
-    
-    console.log('🎉 Flood forecast response prepared successfully');
-    return response;
-    
   } catch (error) {
-    console.error("💥 Critical error in flood forecast generation:", error);
-    throw new Error("Failed to generate comprehensive flood forecast");
+    console.error("Error generating flood forecast:", error);
+    throw new Error("Failed to generate flood forecast");
   }
 }
 
 /**
- * Enhanced forecast analysis with descriptive human-readable output
+ * Analyze forecast data to determine key risk factors and critical times
+ * This is a separate module to demonstrate the modular approach
  */
 export function analyzeForecastData(forecastData: CursorAiResponse) {
-  if (!forecastData?.forecasts?.length) {
-    return {
-      averageRisk: "No data available",
-      peakRiskDay: "Unknown",
-      trend: "Cannot determine trend",
-      sustainedHighRisk: "Insufficient data"
-    };
+  if (!forecastData || !forecastData.forecasts || forecastData.forecasts.length === 0) {
+    return null;
   }
   
-  const forecasts = forecastData.forecasts;
+  // Find the day with the highest flood probability
+  const highestRiskDay = [...forecastData.forecasts].sort((a, b) => b.probability - a.probability)[0];
   
-  // Find highest risk day
-  const highestRiskDay = [...forecasts].sort((a, b) => b.probability - a.probability)[0];
+  // Calculate the average probability across all days
+  const averageProbability = forecastData.forecasts.reduce((sum, day) => sum + day.probability, 0) / 
+    forecastData.forecasts.length;
   
-  // Calculate average probability
-  const averageProbability = forecasts.reduce((sum, day) => sum + day.probability, 0) / forecasts.length;
-  
-  // Determine overall risk level
-  let averageRiskLevel: string;
-  if (averageProbability >= 70) averageRiskLevel = "Severe Risk";
-  else if (averageProbability >= 50) averageRiskLevel = "High Risk";
-  else if (averageProbability >= 30) averageRiskLevel = "Medium Risk";
-  else averageRiskLevel = "Low Risk";
-  
-  // Analyze trend in first 3 days
-  let initialTrend: string;
-  if (forecasts.length >= 3) {
-    const firstDay = forecasts[0].probability;
-    const thirdDay = forecasts[2].probability;
-    const difference = thirdDay - firstDay;
-    
-    if (difference > 10) initialTrend = "Rising trend - risk increasing";
-    else if (difference < -10) initialTrend = "Falling trend - risk decreasing";
-    else initialTrend = "Stable trend - consistent risk levels";
-  } else {
-    initialTrend = "Insufficient data for trend analysis";
-  }
-  
-  // Check for sustained high risk
-  const highRiskDays = forecasts.filter(day => day.probability > 60).length;
-  const sustainedHighRisk = highRiskDays >= 3 ? 
-    `Yes, ${highRiskDays} days with elevated risk detected` : 
-    "No sustained high-risk period identified";
+  // Identify if there's a rising trend in the first 3 days
+  const initialTrend = forecastData.forecasts.length >= 3 
+    ? forecastData.forecasts[2].probability > forecastData.forecasts[0].probability
+      ? 'rising' 
+      : 'falling'
+    : 'stable';
   
   return {
-    averageRisk: `${averageRiskLevel} (${averageProbability.toFixed(1)}% average)`,
-    peakRiskDay: `${new Date(highestRiskDay.date).toLocaleDateString()} (${highestRiskDay.probability}% probability)`,
-    trend: initialTrend,
-    sustainedHighRisk
+    highestRiskDay,
+    averageProbability: Number(averageProbability.toFixed(1)),
+    initialTrend,
+    sustainedHighRisk: forecastData.forecasts.filter(day => day.probability > 70).length >= 3
   };
 }

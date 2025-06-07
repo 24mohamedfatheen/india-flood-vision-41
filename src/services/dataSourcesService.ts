@@ -1,5 +1,12 @@
+
 /**
- * Enhanced Data Sources Service with more realistic data generation
+ * Data Sources Service
+ * 
+ * This module handles interactions with external data sources like weather APIs,
+ * river monitoring systems, and historical flood databases.
+ * 
+ * Each function in this module abstracts the specifics of a particular data source,
+ * handling authentication, request formatting, error handling, and data normalization.
  */
 
 interface IMDWeatherResponse {
@@ -33,76 +40,62 @@ interface CWCRiverResponse {
 }
 
 /**
- * Enhanced weather data with region-specific realistic values
+ * Fetches weather data from the India Meteorological Department (IMD) API
+ * 
+ * API Details:
+ * - Base URL: https://api.imd.gov.in (simulated)
+ * - Endpoint: /weather/current
+ * - Parameters: latitude, longitude, region
+ * - Authentication: API Key in headers
+ * - Rate Limit: 100 requests per day
+ * 
+ * Response Format:
+ * {
+ *   "rainfall": 125,
+ *   "humidity": 85,
+ *   "temperature": 28,
+ *   "timestamp": "2025-05-19T10:30:00Z",
+ *   "forecast": {
+ *     "nextDays": [
+ *       { "date": "2025-05-20", "rainfall": 150, "probability": 80 },
+ *       ...
+ *     ]
+ *   }
+ * }
  */
 export async function fetchWeatherDataFromIMD(
   region: string, 
   coordinates: [number, number]
 ): Promise<IMDWeatherResponse> {
   try {
-    console.log(`🌤️ Fetching enhanced weather data for ${region} at [${coordinates[0]}, ${coordinates[1]}]`);
+    console.log(`Fetching IMD weather data for ${region} at coordinates [${coordinates[0]}, ${coordinates[1]}]`);
     
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // In a real implementation, this would make an HTTP request to the IMD API
+    // For now, we're simulating the response
     
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 600));
+    
+    // Generate realistic data based on region and coordinates
     const [lat, lon] = coordinates;
-    const lowerRegion = region.toLowerCase();
     
-    // Region-specific rainfall patterns
-    let baseRainfall: number;
-    if (lowerRegion.includes('mumbai') || lowerRegion.includes('kerala') || lowerRegion.includes('assam')) {
-      // High rainfall regions
-      baseRainfall = Math.floor(Math.random() * 200) + 150;
-    } else if (lowerRegion.includes('chennai') || lowerRegion.includes('kolkata') || 
-        lowerRegion.includes('odisha')) {
-      // Moderate-high rainfall regions
-      baseRainfall = Math.floor(Math.random() * 150) + 100;
-    } else if (lowerRegion.includes('delhi') || lowerRegion.includes('bihar') || 
-        lowerRegion.includes('uttar pradesh')) {
-      // Moderate rainfall regions
-      baseRainfall = Math.floor(Math.random() * 100) + 60;
-    } else if (lowerRegion.includes('rajasthan') || lowerRegion.includes('gujarat')) {
-      // Lower rainfall regions
-      baseRainfall = Math.floor(Math.random() * 60) + 20;
-    } else {
-      // Default calculation with geographic influence
-      baseRainfall = Math.abs(lat - 20) < 10 ? 
-        Math.floor(Math.random() * 150) + 80 : 
-        Math.floor(Math.random() * 80) + 40;
-    }
+    // Use latitude to influence rainfall (higher rainfall near equator or in mountainous regions)
+    // This is simplified but creates some geographic variation
+    const baseRainfall = Math.abs(lat - 20) < 10 ? 
+      Math.floor(Math.random() * 150) + 100 : 
+      Math.floor(Math.random() * 100) + 30;
     
-    // Temperature based on latitude and region
-    let temperature: number;
-    if (lowerRegion.includes('shimla') || lowerRegion.includes('srinagar') || lat > 30) {
-      temperature = Math.floor(Math.random() * 15) + 15; // Hill stations: 15-30°C
-    } else if (lowerRegion.includes('rajasthan') || lowerRegion.includes('delhi')) {
-      temperature = Math.floor(Math.random() * 15) + 28; // Hot regions: 28-43°C
-    } else {
-      temperature = Math.floor(Math.random() * 12) + 24; // Most regions: 24-36°C
-    }
-    
-    // Humidity based on coastal proximity and region
-    let humidity: number;
-    if (lowerRegion.includes('mumbai') || lowerRegion.includes('kolkata') || 
-        lowerRegion.includes('chennai') || lowerRegion.includes('kochi')) {
-      humidity = Math.floor(Math.random() * 20) + 75; // Coastal: 75-95%
-    } else if (lowerRegion.includes('rajasthan') || lowerRegion.includes('delhi')) {
-      humidity = Math.floor(Math.random() * 25) + 45; // Arid: 45-70%
-    } else {
-      humidity = Math.floor(Math.random() * 25) + 60; // Inland: 60-85%
-    }
-    
-    // Generate realistic 7-day forecast
+    // Generate next 7 days forecast with realistic patterns
     const nextDays = Array.from({ length: 7 }, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() + i + 1);
       
-      // Create realistic rainfall pattern with monsoon-like progression
-      const seasonality = Math.sin((date.getMonth() - 5) * Math.PI / 6); // Peak in July-August
-      const dayVariation = Math.sin(i * 0.8) * 40 + (Math.random() * 50 - 25);
-      const rainfall = Math.max(0, Math.round(baseRainfall * (0.7 + seasonality * 0.5) + dayVariation));
+      // Create realistic rainfall pattern with some days higher than others
+      const dayVariation = Math.sin(i * 0.9) * 50 + (Math.random() * 30);
+      const rainfall = Math.max(0, Math.round(baseRainfall + dayVariation));
       
-      // Probability based on rainfall intensity
-      const probability = Math.min(95, Math.max(10, rainfall * 0.6 + Math.random() * 15));
+      // Calculate probability based on rainfall amount
+      const probability = Math.min(95, Math.max(5, rainfall * 0.4 + Math.random() * 10));
       
       return {
         date: date.toISOString().split('T')[0],
@@ -111,145 +104,136 @@ export async function fetchWeatherDataFromIMD(
       };
     });
     
-    console.log(`✅ Generated weather data: ${baseRainfall}mm rain, ${temperature}°C, ${humidity}% humidity`);
-    
     return {
       rainfall: baseRainfall,
-      humidity,
-      temperature,
+      humidity: Math.floor(Math.random() * 30) + 60, // 60-90%
+      temperature: Math.floor(Math.random() * 10) + 24, // 24-34°C
       timestamp: new Date().toISOString(),
-      forecast: { nextDays }
+      forecast: {
+        nextDays
+      }
     };
-    
   } catch (error) {
-    console.error('❌ Error in weather data simulation:', error);
+    console.error('Error fetching data from IMD API:', error);
     throw new Error('Failed to fetch weather data from IMD');
   }
 }
 
 /**
- * Enhanced river level data with realistic basin-specific values
+ * Fetches river level data from the Central Water Commission (CWC) API
+ * 
+ * API Details:
+ * - Base URL: https://api.cwc.gov.in (simulated)
+ * - Endpoint: /rivers/level
+ * - Parameters: region, state
+ * - Authentication: API Key in headers
+ * - Rate Limit: 1000 requests per day
+ * 
+ * Response Format:
+ * {
+ *   "riverName": "Yamuna",
+ *   "currentLevel": 5.2,
+ *   "dangerLevel": 7.5,
+ *   "warningLevel": 6.0,
+ *   "normalLevel": 3.5,
+ *   "trend": "rising",
+ *   "lastUpdated": "2025-05-19T08:15:00Z",
+ *   "forecast": {
+ *     "expectedChanges": [
+ *       { "date": "2025-05-20", "level": 5.4 },
+ *       ...
+ *     ]
+ *   }
+ * }
  */
 export async function fetchRiverLevelsFromCWC(
   region: string,
   state: string
 ): Promise<CWCRiverResponse> {
   try {
-    console.log(`🏞️ Fetching enhanced river data for ${region}, ${state}`);
+    console.log(`Fetching CWC river data for ${region}, ${state}`);
     
-    await new Promise(resolve => setTimeout(resolve, 900));
+    // In a real implementation, this would make an HTTP request to the CWC API
+    // For now, we're simulating the response
     
-    // Enhanced river mapping with major basin information
-    const riverMap: Record<string, { name: string; dangerLevel: number; normalLevel: number }> = {
-      'Maharashtra': { name: 'Godavari', dangerLevel: 8.5, normalLevel: 4.2 },
-      'West Bengal': { name: 'Hooghly', dangerLevel: 7.8, normalLevel: 3.8 },
-      'Tamil Nadu': { name: 'Cauvery', dangerLevel: 6.5, normalLevel: 3.2 },
-      'Delhi': { name: 'Yamuna', dangerLevel: 7.5, normalLevel: 3.5 },
-      'Karnataka': { name: 'Krishna', dangerLevel: 9.2, normalLevel: 4.8 },
-      'Kerala': { name: 'Periyar', dangerLevel: 5.8, normalLevel: 2.9 },
-      'Assam': { name: 'Brahmaputra', dangerLevel: 12.5, normalLevel: 6.8 },
-      'Bihar': { name: 'Ganga', dangerLevel: 10.2, normalLevel: 5.1 },
-      'Uttar Pradesh': { name: 'Yamuna', dangerLevel: 8.0, normalLevel: 4.0 },
-      'Telangana': { name: 'Krishna', dangerLevel: 8.8, normalLevel: 4.5 },
-      'Gujarat': { name: 'Sabarmati', dangerLevel: 6.2, normalLevel: 2.8 },
-      'Rajasthan': { name: 'Luni', dangerLevel: 4.5, normalLevel: 2.0 },
-      'Madhya Pradesh': { name: 'Narmada', dangerLevel: 7.9, normalLevel: 3.9 },
-      'Odisha': { name: 'Mahanadi', dangerLevel: 8.7, normalLevel: 4.3 },
-      'Andhra Pradesh': { name: 'Godavari', dangerLevel: 9.1, normalLevel: 4.6 },
-      'Punjab': { name: 'Sutlej', dangerLevel: 6.8, normalLevel: 3.4 },
-      'Himachal Pradesh': { name: 'Sutlej', dangerLevel: 5.9, normalLevel: 2.8 },
-      'Uttarakhand': { name: 'Ganga', dangerLevel: 7.2, normalLevel: 3.6 },
-      'Jammu and Kashmir': { name: 'Jhelum', dangerLevel: 6.1, normalLevel: 2.9 }
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 700));
+    
+    // Map of common rivers by state
+    const riverMap: Record<string, string> = {
+      'Maharashtra': 'Godavari',
+      'West Bengal': 'Hooghly',
+      'Tamil Nadu': 'Cauvery',
+      'Delhi': 'Yamuna',
+      'Karnataka': 'Krishna',
+      'Kerala': 'Periyar',
+      'Assam': 'Brahmaputra',
+      'Bihar': 'Ganga',
+      'Uttar Pradesh': 'Yamuna',
+      'Telangana': 'Krishna',
+      'Gujarat': 'Sabarmati',
+      'Rajasthan': 'Luni',
+      'Madhya Pradesh': 'Narmada'
     };
     
-    // Get river info or use default
-    const riverInfo = riverMap[state] || { name: 'Local River', dangerLevel: 7.0, normalLevel: 3.5 };
-    const { name: riverName, dangerLevel, normalLevel } = riverInfo;
-    const warningLevel = normalLevel + (dangerLevel - normalLevel) * 0.7;
+    // Determine river name based on state
+    const riverName = riverMap[state] || 'Local River';
     
-    // Generate more realistic current level based on region's flood proneness
-    const lowerRegion = region.toLowerCase();
-    let riskMultiplier = 0.6; // Default: 60% between normal and warning
+    // Generate realistic river levels and trends
+    // More realistic current level (between normal and danger)
+    const normalLevel = 3.5;
+    const warningLevel = 6.0;
+    const dangerLevel = 7.5;
     
-    if (lowerRegion.includes('bihar') || lowerRegion.includes('assam') || 
-        lowerRegion.includes('kerala') || lowerRegion.includes('odisha')) {
-      riskMultiplier = 0.8; // High-risk regions: closer to warning level
-    } else if (lowerRegion.includes('rajasthan') || lowerRegion.includes('gujarat')) {
-      riskMultiplier = 0.4; // Lower-risk regions: closer to normal level
-    }
+    // Current level is between normal and warning for most cases
+    const currentLevel = normalLevel + 
+      ((warningLevel - normalLevel) * (Math.random() * 0.8 + 0.1));
     
-    const levelRange = warningLevel - normalLevel;
-    const currentLevel = normalLevel + (levelRange * riskMultiplier) + (Math.random() * 0.5 - 0.25);
+    // Generate trend based on region's first letter (arbitrary but consistent)
+    const trendValue = region.charCodeAt(0) % 3;
+    const trend = trendValue === 0 ? 'rising' : (trendValue === 1 ? 'falling' : 'stable');
     
-    // Generate realistic trend with appropriate probabilities
-    const trendProbabilities = [0.4, 0.3, 0.3]; // rising, stable, falling
-    const randomValue = Math.random();
-    let trend: 'rising' | 'falling' | 'stable';
-    
-    if (randomValue < trendProbabilities[0]) {
-      trend = 'rising';
-    } else if (randomValue < trendProbabilities[0] + trendProbabilities[1]) {
-      trend = 'stable';
-    } else {
-      trend = 'falling';
-    }
-    
-    // Adjust current level slightly based on trend
-    let adjustedCurrentLevel = currentLevel;
-    if (trend === 'rising') {
-      adjustedCurrentLevel += Math.random() * 0.3;
-    } else if (trend === 'falling') {
-      adjustedCurrentLevel -= Math.random() * 0.2;
-    }
-    
-    // Ensure level is within realistic bounds
-    adjustedCurrentLevel = Math.max(normalLevel * 0.8, Math.min(dangerLevel * 1.1, adjustedCurrentLevel));
-    
-    // Generate 5-day forecast with realistic progression
+    // Generate forecast for next 5 days
     const expectedChanges = Array.from({ length: 5 }, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() + i + 1);
       
-      let dailyChange = 0;
+      // Calculate level change based on trend
+      let levelChange = 0;
       if (trend === 'rising') {
-        dailyChange = 0.15 + (Math.random() * 0.25); // 0.15-0.40m rise per day
+        levelChange = 0.1 + (Math.random() * 0.3); // Rising by 0.1-0.4m per day
       } else if (trend === 'falling') {
-        dailyChange = -0.10 - (Math.random() * 0.20); // 0.10-0.30m fall per day
+        levelChange = -0.1 - (Math.random() * 0.2); // Falling by 0.1-0.3m per day
       } else {
-        dailyChange = (Math.random() * 0.15) - 0.075; // Small fluctuations
+        levelChange = (Math.random() * 0.2) - 0.1; // Fluctuating slightly
       }
       
-      // Add increasing uncertainty for future days
-      const uncertainty = Math.random() * 0.1 * (i + 1);
-      const projectedLevel = Math.max(
-        normalLevel * 0.7, 
-        Math.min(
-          dangerLevel * 1.2, 
-          adjustedCurrentLevel + (dailyChange * (i + 1)) + uncertainty
-        )
-      );
+      // Apply the change, with more randomness for later days
+      const dayVariation = Math.random() * 0.1 * i;
+      const level = Math.max(normalLevel * 0.8, 
+                           Math.min(dangerLevel * 1.1, 
+                                  currentLevel + (levelChange * (i + 1)) + dayVariation));
       
       return {
         date: date.toISOString().split('T')[0],
-        level: Number(projectedLevel.toFixed(1))
+        level: Number(level.toFixed(1))
       };
     });
     
-    console.log(`✅ Generated river data for ${riverName}: ${adjustedCurrentLevel.toFixed(1)}m (${trend})`);
-    
     return {
       riverName,
-      currentLevel: Number(adjustedCurrentLevel.toFixed(1)),
+      currentLevel: Number(currentLevel.toFixed(1)),
       dangerLevel,
-      warningLevel: Number(warningLevel.toFixed(1)),
+      warningLevel,
       normalLevel,
       trend,
       lastUpdated: new Date().toISOString(),
-      forecast: { expectedChanges }
+      forecast: {
+        expectedChanges
+      }
     };
-    
   } catch (error) {
-    console.error('❌ Error in river data simulation:', error);
+    console.error('Error fetching data from CWC API:', error);
     throw new Error('Failed to fetch river level data from CWC');
   }
 }
@@ -262,24 +246,30 @@ export async function fetchHistoricalFloodData(region: string, years: number = 1
   try {
     console.log(`Fetching historical flood data for ${region} over ${years} years`);
     
+    // Simulate API call with delay
     await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // In a real implementation, this would fetch from a historical database
+    // For now, generate simulated historical data
     
     const currentYear = new Date().getFullYear();
     const historicalEvents = [];
     
+    // Generate some random but plausible historical flood events
     for (let y = 0; y < years; y++) {
       const year = currentYear - y;
       
+      // Not every year has a flood
       if (Math.random() > 0.6) {
         const month = Math.floor(Math.random() * 12);
         const day = Math.floor(Math.random() * 28) + 1;
         
         historicalEvents.push({
           date: `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-          severity: Math.floor(Math.random() * 5) + 1,
-          affectedArea: Math.floor(Math.random() * 1000) + 50,
-          casualties: Math.floor(Math.random() * 50),
-          economicLoss: Math.floor(Math.random() * 1000) + 10,
+          severity: Math.floor(Math.random() * 5) + 1, // 1-5 severity scale
+          affectedArea: Math.floor(Math.random() * 1000) + 50, // 50-1050 sq km
+          casualties: Math.floor(Math.random() * 50), // 0-50 casualties
+          economicLoss: Math.floor(Math.random() * 1000) + 10, // 10-1010 crore rupees
         });
       }
     }
