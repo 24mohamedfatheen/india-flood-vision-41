@@ -9,30 +9,61 @@ import EvacuationPlan from './pages/EvacuationPlan';
 import { AuthProvider } from './context/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 import EmergencyReportForm from './components/EmergencyReportForm';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
+  console.log('App component rendering');
+  
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <div className="App">
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/emergency-reports" element={<EmergencyReports />} />
-            <Route path="/evacuation-plan" element={<EvacuationPlan />} />
-            <Route path="/emergency-report" element={
-              <div className="min-h-screen bg-background py-8">
-                <div className="container mx-auto px-4">
-                  <EmergencyReportForm />
-                </div>
-              </div>
-            } />
-          </Routes>
-          <Toaster />
-        </div>
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ErrorBoundary>
+          <AuthProvider>
+            <div className="App">
+              <ErrorBoundary>
+                <Routes>
+                  <Route path="/" element={
+                    <ErrorBoundary>
+                      <Index />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/login" element={
+                    <ErrorBoundary>
+                      <Login />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/admin" element={
+                    <ErrorBoundary>
+                      <AdminDashboard />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/emergency-reports" element={
+                    <ErrorBoundary>
+                      <EmergencyReports />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/evacuation-plan" element={
+                    <ErrorBoundary>
+                      <EvacuationPlan />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/emergency-report" element={
+                    <ErrorBoundary>
+                      <div className="min-h-screen bg-background py-8">
+                        <div className="container mx-auto px-4">
+                          <EmergencyReportForm />
+                        </div>
+                      </div>
+                    </ErrorBoundary>
+                  } />
+                </Routes>
+              </ErrorBoundary>
+              <Toaster />
+            </div>
+          </AuthProvider>
+        </ErrorBoundary>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

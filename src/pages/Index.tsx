@@ -15,8 +15,11 @@ import { Button } from '../components/ui/button';
 import { useAuth } from '../context/AuthContext';
 import { Skeleton } from '../components/ui/skeleton';
 import CursorAiIndicator from '../components/CursorAiIndicator';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const Index = () => {
+  console.log('Index component starting to render');
+  
   const [selectedRegion, setSelectedRegion] = useState('mumbai');
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [nextUpdateTime, setNextUpdateTime] = useState<Date>(new Date(Date.now() + 12 * 60 * 60 * 1000));
@@ -26,9 +29,13 @@ const Index = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentFloodData, setCurrentFloodData] = useState(floodData);
   
+  console.log('Index: Initial state set');
+  
   const { toast } = useToast();
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  
+  console.log('Index: Hooks initialized');
   
   // Use the new reservoir flood data hook
   const { 
@@ -39,13 +46,18 @@ const Index = () => {
     reservoirCount
   } = useReservoirFloodData();
 
+  console.log('Index: Reservoir hook initialized');
+
   // Get current region's flood data (now enhanced with live reservoir data)
   const floodDataForRegion = getFloodDataForRegion(selectedRegion);
   const enhancedFloodData = floodDataForRegion ? 
     updateFloodDataWithReservoirs([floodDataForRegion])[0] : null;
 
+  console.log('Index: Flood data processed');
+
   // Improved data fetching function with consistency handling
   const loadFloodData = useCallback(async (forceRefresh = false) => {
+    console.log('loadFloodData called with forceRefresh:', forceRefresh);
     const currentState = forceRefresh ? 'updating' : dataFreshness;
     setDataFreshness(currentState);
     
@@ -95,11 +107,13 @@ const Index = () => {
   
   // Initial data fetch
   useEffect(() => {
+    console.log('Index: Initial data fetch effect');
     loadFloodData(false);
   }, [loadFloodData]);
 
   // Update flood data when reservoir data changes
   useEffect(() => {
+    console.log('Index: Reservoir data change effect');
     if (!reservoirLoading) {
       const updatedFloodData = updateFloodDataWithReservoirs(floodData);
       setCurrentFloodData(updatedFloodData);
@@ -107,6 +121,7 @@ const Index = () => {
   }, [reservoirLoading, updateFloodDataWithReservoirs]);
 
   const handleRegionChange = (region: string) => {
+    console.log('Region changed to:', region);
     setSelectedRegion(region);
   };
   
@@ -160,13 +175,19 @@ const Index = () => {
     return () => clearInterval(freshnessInterval);
   }, [lastUpdateTime]);
 
+  console.log('Index: About to render JSX');
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-4">
-          <Header />
+          <ErrorBoundary>
+            <Header />
+          </ErrorBoundary>
           <div className="flex items-center gap-2">
-            <CursorAiIndicator />
+            <ErrorBoundary>
+              <CursorAiIndicator />
+            </ErrorBoundary>
             {isAuthenticated ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
@@ -210,18 +231,22 @@ const Index = () => {
         </div>
         
         {/* Region Selector */}
-        <RegionSelector 
-          selectedRegion={selectedRegion}
-          onRegionChange={handleRegionChange}
-        />
+        <ErrorBoundary>
+          <RegionSelector 
+            selectedRegion={selectedRegion}
+            onRegionChange={handleRegionChange}
+          />
+        </ErrorBoundary>
         
         {/* Map - removed mb-6 to reduce spacing */}
         <div className="mb-4">
-          <Map 
-            selectedRegion={selectedRegion} 
-            className="w-full"
-            aspectRatio={16/9}
-          />
+          <ErrorBoundary>
+            <Map 
+              selectedRegion={selectedRegion} 
+              className="w-full"
+              aspectRatio={16/9}
+            />
+          </ErrorBoundary>
         </div>
         
         <div className="mb-6 flex items-center justify-between flex-wrap">
@@ -289,9 +314,15 @@ const Index = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
               <div className="lg:col-span-2 space-y-6">
                 {/* Left side content */}
-                <FloodStats floodData={enhancedFloodData} />
-                <ChartSection selectedRegion={selectedRegion} />
-                <PredictionCard floodData={enhancedFloodData} />
+                <ErrorBoundary>
+                  <FloodStats floodData={enhancedFloodData} />
+                </ErrorBoundary>
+                <ErrorBoundary>
+                  <ChartSection selectedRegion={selectedRegion} />
+                </ErrorBoundary>
+                <ErrorBoundary>
+                  <PredictionCard floodData={enhancedFloodData} />
+                </ErrorBoundary>
               </div>
               
               {/* Right side content */}
@@ -352,7 +383,11 @@ const Index = () => {
             </div>
             
             {/* Historical Flood Data Section */}
-            {showHistoricalData && <HistoricalFloodData />}
+            {showHistoricalData && (
+              <ErrorBoundary>
+                <HistoricalFloodData />
+              </ErrorBoundary>
+            )}
           </>
         )}
         
