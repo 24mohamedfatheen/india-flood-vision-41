@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
@@ -210,14 +209,14 @@ const Index = () => {
           </div>
         </div>
         
-        {/* Region Selector first */}
+        {/* Region Selector */}
         <RegionSelector 
           selectedRegion={selectedRegion}
           onRegionChange={handleRegionChange}
         />
         
-        {/* Map now placed between region selector and timestamps/refresh controls */}
-        <div className="mb-6">
+        {/* Map - removed mb-6 to reduce spacing */}
+        <div className="mb-4">
           <Map 
             selectedRegion={selectedRegion} 
             className="w-full"
@@ -295,7 +294,7 @@ const Index = () => {
                 <PredictionCard floodData={enhancedFloodData} />
               </div>
               
-              {/* Right side content - additional info, no map here anymore */}
+              {/* Right side content */}
               <div className="lg:col-span-1">
                 <div className="sticky top-6 bg-white p-4 rounded-lg shadow">
                   <h2 className="text-lg font-medium mb-2">Flood Risk Information</h2>

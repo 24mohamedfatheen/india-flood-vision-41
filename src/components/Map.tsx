@@ -6,7 +6,6 @@ import { Navigation } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 
-// We're using lazy loading to ensure Leaflet only loads in the browser
 const MapComponent = lazy(() => import('./map/Map'));
 
 const Map: React.FC<{ 
@@ -32,7 +31,7 @@ const Map: React.FC<{
         <Link to="/evacuation-plan">
           <Button className="bg-red-600 hover:bg-red-700 text-white shadow-lg">
             <Navigation className="mr-2 h-4 w-4" />
-            Emergency Evacuation Plan
+            Emergency Plan
           </Button>
         </Link>
       </div>
