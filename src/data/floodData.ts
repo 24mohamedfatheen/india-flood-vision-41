@@ -56,6 +56,7 @@ export interface FloodData {
   populationAffected: number;
   coordinates: [number, number]; // [latitude, longitude]
   timestamp: string;
+  lastUpdated: string; // Add missing lastUpdated property
   currentRainfall: number; // Derived rainfall for charts
   historicalRainfallData: { year: number; month: string; rainfall: number; }[]; // Updated type for multi-year data
   predictionAccuracy: number;
@@ -149,6 +150,7 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
       populationAffected: 0, // Remain 0 unless directly provided in Supabase
       coordinates,
       timestamp: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(), // Add lastUpdated field
       currentRainfall: derivedCurrentRainfall,
       historicalRainfallData: [], // Initialize empty, getHistoricalRainfallData will populate
       predictionAccuracy: 85,
@@ -259,6 +261,7 @@ export const fetchImdData = async (forceRefresh = false): Promise<FloodData[]> =
           populationAffected: 0, // No dummy data
           coordinates,
           timestamp: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(), // Add lastUpdated field
           currentRainfall: currentRainfallValue,
           historicalRainfallData: [],
           predictionAccuracy: 70,
@@ -291,6 +294,7 @@ export const fetchImdData = async (forceRefresh = false): Promise<FloodData[]> =
         populationAffected: 0,
         coordinates,
         timestamp: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(), // Add lastUpdated field
         currentRainfall: 5, // Fixed minimum
         historicalRainfallData: [],
         predictionAccuracy: 70,
