@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import Header from '@/components/Header';
@@ -8,96 +8,35 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertTriangle, FileText } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-// Mock data for emergency reports
-const mockEmergencyReports = [
-  {
-    id: '1',
-    name: 'Rajesh Kumar',
-    contactNumber: '+91 9876543210',
-    location: 'Near Krishna Temple, Ghati Village',
-    numPeople: '4',
-    hasDisabled: true,
-    hasMedicalNeeds: true,
-    medicalDetails: 'Elderly person with diabetes needs medication',
-    hasWaterFood: false,
-    waterFoodDuration: '',
-    situationDescription: 'Water level is rising, first floor already flooded. We are on the second floor.',
-    urgencyLevel: 'high',
-    timestamp: '2025-05-11T15:30:00',
-    status: 'pending'
-  },
-  {
-    id: '2',
-    name: 'Priya Singh',
-    contactNumber: '+91 8765432109',
-    location: 'Green Park Apartments, Block C, Flat 302',
-    numPeople: '2',
-    hasDisabled: false,
-    hasMedicalNeeds: false,
-    medicalDetails: '',
-    hasWaterFood: true,
-    waterFoodDuration: '2 days',
-    situationDescription: 'Area is flooded but we are safe at the moment. Roads are blocked.',
-    urgencyLevel: 'medium',
-    timestamp: '2025-05-11T14:15:00',
-    status: 'in_progress'
-  },
-  {
-    id: '3',
-    name: 'Mohammed Ali',
-    contactNumber: '+91 7654321098',
-    location: 'Blue Hills School, Main Road',
-    numPeople: '12',
-    hasDisabled: true,
-    hasMedicalNeeds: true,
-    medicalDetails: 'One child with asthma, needs inhaler',
-    hasWaterFood: true,
-    waterFoodDuration: '1 day',
-    situationDescription: 'Group of families took shelter in school building. Water is entering ground floor.',
-    urgencyLevel: 'high',
-    timestamp: '2025-05-11T12:45:00',
-    status: 'pending'
-  },
-  {
-    id: '4',
-    name: 'Anita Sharma',
-    contactNumber: '+91 6543210987',
-    location: 'River View Colony, House 45',
-    numPeople: '3',
-    hasDisabled: false,
-    hasMedicalNeeds: false,
-    medicalDetails: '',
-    hasWaterFood: false,
-    waterFoodDuration: '',
-    situationDescription: 'Water is nearly at our doorstep, may need evacuation soon.',
-    urgencyLevel: 'medium',
-    timestamp: '2025-05-11T11:20:00',
-    status: 'resolved'
-  },
-  {
-    id: '5',
-    name: 'Suresh Patel',
-    contactNumber: '+91 5432109876',
-    location: 'Old Market Area, Behind Temple',
-    numPeople: '6',
-    hasDisabled: true,
-    hasMedicalNeeds: false,
-    medicalDetails: '',
-    hasWaterFood: true,
-    waterFoodDuration: '3 days',
-    situationDescription: 'Entire family on terrace, water level rising rapidly in the area.',
-    urgencyLevel: 'high',
-    timestamp: '2025-05-11T10:05:00',
-    status: 'in_progress'
-  }
-];
+interface EmergencyReport {
+  id: string;
+  name: string;
+  contact_number: string;
+  location: string;
+  num_people: number;
+  has_disabled: boolean;
+  has_medical_needs: boolean;
+  medical_details: string | null;
+  has_water_food: boolean;
+  water_food_duration: string | null;
+  situation_description: string;
+  urgency_level: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
 
 const EmergencyReports = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [selectedReport, setSelectedReport] = useState(null);
+  const { toast } = useToast();
+  const [selectedReport, setSelectedReport] = useState<EmergencyReport | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [reports, setReports] = useState<EmergencyReport[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Redirect to login if not authenticated as admin
   React.useEffect(() => {
@@ -106,22 +45,83 @@ const EmergencyReports = () => {
     }
   }, [user, navigate]);
 
+  // Fetch emergency reports from Supabase
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('emergency_reports')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching emergency reports:', error);
+          toast({
+            title: "Error",
+            description: "Failed to fetch emergency reports.",
+            variant: "destructive",
+          });
+        } else {
+          setReports(data || []);
+        }
+      } catch (error) {
+        console.error('Unexpected error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (user && user.userType === 'admin') {
+      fetchReports();
+    }
+  }, [user, toast]);
+
   if (!user || user.userType !== 'admin') {
     return null; // Don't render anything while redirecting
   }
 
-  const handleViewReport = (report) => {
+  const handleViewReport = (report: EmergencyReport) => {
     setSelectedReport(report);
     setIsDialogOpen(true);
   };
 
-  const handleUpdateStatus = (reportId, newStatus) => {
-    console.log(`Updating report ${reportId} status to ${newStatus}`);
-    // In a real application, this would update the status in the database
-    // For now, we'll just log it
+  const handleUpdateStatus = async (reportId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('emergency_reports')
+        .update({ status: newStatus })
+        .eq('id', reportId);
+
+      if (error) {
+        console.error('Error updating status:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update report status.",
+          variant: "destructive",
+        });
+      } else {
+        // Update local state
+        setReports(reports.map(report => 
+          report.id === reportId 
+            ? { ...report, status: newStatus }
+            : report
+        ));
+        
+        if (selectedReport && selectedReport.id === reportId) {
+          setSelectedReport({ ...selectedReport, status: newStatus });
+        }
+
+        toast({
+          title: "Success",
+          description: "Report status updated successfully.",
+        });
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+    }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
         return <Badge variant="destructive">Pending</Badge>;
@@ -134,7 +134,7 @@ const EmergencyReports = () => {
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-IN', {
       day: 'numeric',
       month: 'short',
@@ -143,6 +143,19 @@ const EmergencyReports = () => {
       minute: '2-digit'
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-6">
+          <Header />
+          <div className="flex justify-center items-center h-64">
+            <p>Loading emergency reports...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -163,52 +176,56 @@ const EmergencyReports = () => {
         <div className="bg-white rounded-lg shadow">
           <div className="p-4 border-b flex items-center gap-2">
             <FileText className="h-5 w-5 text-red-600" />
-            <h2 className="text-lg font-medium">Emergency Assistance Reports</h2>
+            <h2 className="text-lg font-medium">Emergency Assistance Reports ({reports.length})</h2>
           </div>
           
           <div className="p-4">
-            <Table>
-              <TableCaption>Emergency reports requiring attention</TableCaption>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>People</TableHead>
-                  <TableHead>Urgency</TableHead>
-                  <TableHead>Reported</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockEmergencyReports.map((report) => (
-                  <TableRow key={report.id}>
-                    <TableCell className="font-mono">{report.id}</TableCell>
-                    <TableCell>{report.name}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{report.location}</TableCell>
-                    <TableCell>{report.numPeople}</TableCell>
-                    <TableCell>
-                      {report.urgencyLevel === 'high' ? (
-                        <div className="flex items-center gap-1 text-red-600">
-                          <AlertTriangle className="h-4 w-4" />
-                          <span>High</span>
-                        </div>
-                      ) : report.urgencyLevel === 'medium' ? (
-                        <span className="text-yellow-600">Medium</span>
-                      ) : (
-                        <span>Low</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{formatDate(report.timestamp)}</TableCell>
-                    <TableCell>{getStatusBadge(report.status)}</TableCell>
-                    <TableCell>
-                      <Button size="sm" onClick={() => handleViewReport(report)}>View Details</Button>
-                    </TableCell>
+            {reports.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No emergency reports found.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableCaption>Emergency reports requiring attention</TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>People</TableHead>
+                    <TableHead>Urgency</TableHead>
+                    <TableHead>Reported</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {reports.map((report) => (
+                    <TableRow key={report.id}>
+                      <TableCell>{report.name}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{report.location}</TableCell>
+                      <TableCell>{report.num_people}</TableCell>
+                      <TableCell>
+                        {report.urgency_level === 'high' ? (
+                          <div className="flex items-center gap-1 text-red-600">
+                            <AlertTriangle className="h-4 w-4" />
+                            <span>High</span>
+                          </div>
+                        ) : report.urgency_level === 'medium' ? (
+                          <span className="text-yellow-600">Medium</span>
+                        ) : (
+                          <span>Low</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{formatDate(report.created_at)}</TableCell>
+                      <TableCell>{getStatusBadge(report.status)}</TableCell>
+                      <TableCell>
+                        <Button size="sm" onClick={() => handleViewReport(report)}>View Details</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </div>
       </div>
@@ -217,9 +234,9 @@ const EmergencyReports = () => {
         {selectedReport && (
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Emergency Report #{selectedReport.id}</DialogTitle>
+              <DialogTitle>Emergency Report Details</DialogTitle>
               <DialogDescription>
-                Submitted on {formatDate(selectedReport.timestamp)}
+                Submitted on {formatDate(selectedReport.created_at)}
               </DialogDescription>
             </DialogHeader>
             
@@ -228,7 +245,7 @@ const EmergencyReports = () => {
                 <h3 className="text-sm font-medium text-gray-500">Reporter Information</h3>
                 <div className="mt-2 space-y-2">
                   <p><span className="font-medium">Name:</span> {selectedReport.name}</p>
-                  <p><span className="font-medium">Contact:</span> {selectedReport.contactNumber}</p>
+                  <p><span className="font-medium">Contact:</span> {selectedReport.contact_number}</p>
                   <p><span className="font-medium">Location:</span> {selectedReport.location}</p>
                 </div>
               </div>
@@ -236,32 +253,32 @@ const EmergencyReports = () => {
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Situation Details</h3>
                 <div className="mt-2 space-y-2">
-                  <p><span className="font-medium">People affected:</span> {selectedReport.numPeople}</p>
-                  <p><span className="font-medium">Urgency level:</span> {selectedReport.urgencyLevel.toUpperCase()}</p>
+                  <p><span className="font-medium">People affected:</span> {selectedReport.num_people}</p>
+                  <p><span className="font-medium">Urgency level:</span> {selectedReport.urgency_level.toUpperCase()}</p>
                   <p><span className="font-medium">Status:</span> {getStatusBadge(selectedReport.status)}</p>
                 </div>
               </div>
               
               <div className="md:col-span-2">
                 <h3 className="text-sm font-medium text-gray-500">Situation Description</h3>
-                <p className="mt-2 text-gray-700">{selectedReport.situationDescription}</p>
+                <p className="mt-2 text-gray-700">{selectedReport.situation_description}</p>
               </div>
               
               <div className="md:col-span-2">
                 <h3 className="text-sm font-medium text-gray-500">Special Needs</h3>
                 <div className="mt-2 space-y-2">
-                  {selectedReport.hasDisabled && (
+                  {selectedReport.has_disabled && (
                     <p><span className="font-medium">Has disabled/elderly:</span> Yes</p>
                   )}
                   
-                  {selectedReport.hasMedicalNeeds && (
-                    <p><span className="font-medium">Medical needs:</span> {selectedReport.medicalDetails}</p>
+                  {selectedReport.has_medical_needs && selectedReport.medical_details && (
+                    <p><span className="font-medium">Medical needs:</span> {selectedReport.medical_details}</p>
                   )}
                   
-                  <p><span className="font-medium">Food/water available:</span> {selectedReport.hasWaterFood ? 'Yes' : 'No'}</p>
+                  <p><span className="font-medium">Food/water available:</span> {selectedReport.has_water_food ? 'Yes' : 'No'}</p>
                   
-                  {selectedReport.hasWaterFood && selectedReport.waterFoodDuration && (
-                    <p><span className="font-medium">Supplies duration:</span> {selectedReport.waterFoodDuration}</p>
+                  {selectedReport.has_water_food && selectedReport.water_food_duration && (
+                    <p><span className="font-medium">Supplies duration:</span> {selectedReport.water_food_duration}</p>
                   )}
                 </div>
               </div>

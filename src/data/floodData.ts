@@ -233,6 +233,14 @@ const getBaseRiskLevel = (cityName: string): 'low' | 'medium' | 'high' | 'severe
   return cityRiskLevels[cityName.toLowerCase()] || 'medium';
 };
 
+// Helper function to calculate risk level based on prediction probability
+const calculateRiskFromProbability = (probability: number): 'low' | 'medium' | 'high' | 'severe' => {
+  if (probability >= 70) return 'severe';
+  if (probability >= 50) return 'high';
+  if (probability >= 30) return 'medium';
+  return 'low';
+};
+
 // Helper function to map IMDRegionData to FloodData
 const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
   const currentYear = new Date().getFullYear();
@@ -250,31 +258,38 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
     const regionCoords = regions.find(r => r.value === item.district.toLowerCase())?.coordinates;
     const coordinates: [number, number] = regionCoords ? [regionCoords[0], regionCoords[1]] : [0, 0];
 
-    // Get base risk level for the city and potentially upgrade it based on live data
-    let finalRiskLevel = getBaseRiskLevel(item.district);
-    
-    // Upgrade risk level based on live data conditions
-    if (item.floodRiskLevel === 'severe' || 
-        item.reservoirPercentage > 90 || 
-        item.inflowCusecs > 10000) {
-      finalRiskLevel = 'severe';
-    } else if (item.floodRiskLevel === 'high' || 
-               item.reservoirPercentage > 75 || 
-               item.inflowCusecs > 5000) {
-      // Only upgrade to high if current level is not already severe
-      if (finalRiskLevel !== 'severe') {
-        finalRiskLevel = 'high';
-      }
-    } else if (item.floodRiskLevel === 'medium' || 
-               item.reservoirPercentage > 50 || 
-               item.inflowCusecs > 1000) {
-      // Only upgrade to medium if current level is low
-      if (finalRiskLevel === 'low') {
-        finalRiskLevel = 'medium';
-      }
+    // Calculate base prediction probability for risk assessment
+    const riskLevelBase = {
+      'low': 20,
+      'medium': 35,
+      'high': 50,
+      'severe': 70
+    };
+
+    let baseValue = riskLevelBase[item.floodRiskLevel || 'medium'];
+
+    // Adjust based on reservoir conditions
+    if (item.reservoirPercentage > 90 || item.inflowCusecs > 10000) {
+      baseValue = Math.max(baseValue, 70); // Severe threshold
+    } else if (item.reservoirPercentage > 75 || item.inflowCusecs > 5000) {
+      baseValue = Math.max(baseValue, 50); // High threshold
+    } else if (item.reservoirPercentage > 50 || item.inflowCusecs > 1000) {
+      baseValue = Math.max(baseValue, 30); // Medium threshold
     }
 
-    console.log(`Mapping ${item.district}: base risk=${getBaseRiskLevel(item.district)}, live risk=${item.floodRiskLevel}, final risk=${finalRiskLevel}`);
+    // Add rainfall effect
+    if (derivedCurrentRainfall > 50) {
+      const rainfallEffect = Math.floor((derivedCurrentRainfall - 50) / 100) * 5;
+      baseValue += rainfallEffect;
+    }
+
+    // Cap baseValue to reasonable max
+    baseValue = Math.min(80, baseValue);
+
+    // Calculate final risk level based on prediction probability
+    const finalRiskLevel = calculateRiskFromProbability(baseValue);
+
+    console.log(`Mapping ${item.district}: probability=${baseValue}%, risk=${finalRiskLevel}`);
 
     return {
       id: index + 1,
@@ -306,11 +321,12 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
   return mappedData;
 };
 
-// Create diverse static fallback data with different risk levels
+// Create diverse static fallback data with aligned risk levels
 const createDiverseStaticData = (): FloodData[] => {
   return regions.map((r, index) => {
-    // Get risk level for the city, default to medium if not found
-    const riskLevel = getBaseRiskLevel(r.label);
+    // Calculate prediction probability for this region
+    const baseProbability = 25 + (index % 50); // Vary between 25-75%
+    const finalRiskLevel = calculateRiskFromProbability(baseProbability);
     
     // Set affected area and population based on risk level
     const riskMultipliers = {
@@ -320,21 +336,21 @@ const createDiverseStaticData = (): FloodData[] => {
       'severe': { area: 300, population: 500000 }
     };
     
-    const multiplier = riskMultipliers[riskLevel];
+    const multiplier = riskMultipliers[finalRiskLevel];
     const coordinates: [number, number] = [r.coordinates[0], r.coordinates[1]];
 
-    console.log(`Creating static data for ${r.label} with risk level: ${riskLevel}`);
+    console.log(`Creating static data for ${r.label} with probability=${baseProbability}%, risk level: ${finalRiskLevel}`);
 
     return {
       id: index + 1,
       region: r.label,
       state: r.state,
-      riskLevel,
+      riskLevel: finalRiskLevel,
       affectedArea: multiplier.area,
       populationAffected: multiplier.population,
       coordinates,
       timestamp: new Date().toISOString(),
-      currentRainfall: riskLevel === 'severe' ? 150 : riskLevel === 'high' ? 100 : riskLevel === 'medium' ? 60 : 20,
+      currentRainfall: finalRiskLevel === 'severe' ? 150 : finalRiskLevel === 'high' ? 100 : finalRiskLevel === 'medium' ? 60 : 20,
       historicalRainfallData: [],
       predictionAccuracy: 70,
       estimatedDamage: { crops: 0, properties: 0, infrastructure: 0 }
@@ -441,29 +457,58 @@ export const getFloodDataForRegion = (region: string): FloodData | null => {
   return floodData[0] || null;
 };
 
-// historicalRainfallData (Strictly Static)
+// Enhanced historicalRainfallData function with better fallback
 export const getHistoricalRainfallData = (region: string, year: number) => {
   const regionLower = region.toLowerCase();
-  const historicalForRegion = staticHistoricalRainfallData[regionLower];
-
+  
+  // First try to find data for the exact region
+  let historicalForRegion = staticHistoricalRainfallData[regionLower];
+  
+  // If not found, try to find data for a similar region or state
   if (!historicalForRegion || historicalForRegion.length === 0) {
-    // If region not found in staticHistoricalRainfallData, return empty array
-    return [];
+    const regionData = getFloodDataForRegion(region);
+    if (regionData) {
+      const stateLower = regionData.state.toLowerCase();
+      // Try to find data for any region in the same state
+      const stateRegions = Object.keys(staticHistoricalRainfallData).filter(key => {
+        const stateData = regions.find(r => r.value === key);
+        return stateData && stateData.state.toLowerCase() === stateLower;
+      });
+      
+      if (stateRegions.length > 0) {
+        historicalForRegion = staticHistoricalRainfallData[stateRegions[0]];
+      }
+    }
+  }
+  
+  // If still no data, generate reasonable default data based on region characteristics
+  if (!historicalForRegion || historicalForRegion.length === 0) {
+    console.log(`No historical data found for ${region}, generating default pattern`);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Generate a reasonable monsoon pattern for India
+    const monsoonPattern = [20, 15, 25, 35, 80, 150, 200, 180, 120, 60, 25, 20];
+    
+    return months.map((month, index) => ({
+      year: year,
+      month,
+      rainfall: monsoonPattern[index]
+    }));
   }
 
-  // Filter for the specific year from static data
+  // Filter for the specific year from available data
   const yearData = historicalForRegion.filter(d => d.year === year);
 
   if (yearData.length > 0) {
     // If year-specific data is found, use it directly
-    return yearData.map(d => ({ month: d.month, rainfall: d.rainfall }));
+    return yearData.map(d => ({ year: d.year, month: d.month, rainfall: d.rainfall }));
   } else {
-    // If static data exists for region but not for specific year,
-    // calculate average pattern from available static years (non-random)
+    // If data exists for region but not for specific year,
+    // calculate average pattern from available years (non-random)
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const averageMonthlyPattern: Record<string, number> = {};
 
-    // Calculate average rainfall for each month across all static years
+    // Calculate average rainfall for each month across all available years
     months.forEach(month => {
       const monthlyValues = historicalForRegion.filter(d => d.month === month).map(d => d.rainfall);
       averageMonthlyPattern[month] = monthlyValues.length > 0
@@ -480,7 +525,7 @@ export const getHistoricalRainfallData = (region: string, year: number) => {
 };
 
 export const getPredictionData = (region: string) => {
-  // Return 10-day flood prediction data
+  // Return 10-day flood prediction data aligned with risk levels
   const regionData = getFloodDataForRegion(region);
   const riskLevelBase = {
     'low': 20,

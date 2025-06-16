@@ -9,6 +9,60 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      emergency_reports: {
+        Row: {
+          contact_number: string
+          created_at: string
+          has_disabled: boolean | null
+          has_medical_needs: boolean | null
+          has_water_food: boolean | null
+          id: string
+          location: string
+          medical_details: string | null
+          name: string
+          num_people: number
+          situation_description: string
+          status: string
+          updated_at: string
+          urgency_level: string
+          water_food_duration: string | null
+        }
+        Insert: {
+          contact_number: string
+          created_at?: string
+          has_disabled?: boolean | null
+          has_medical_needs?: boolean | null
+          has_water_food?: boolean | null
+          id?: string
+          location: string
+          medical_details?: string | null
+          name: string
+          num_people: number
+          situation_description: string
+          status?: string
+          updated_at?: string
+          urgency_level: string
+          water_food_duration?: string | null
+        }
+        Update: {
+          contact_number?: string
+          created_at?: string
+          has_disabled?: boolean | null
+          has_medical_needs?: boolean | null
+          has_water_food?: boolean | null
+          id?: string
+          location?: string
+          medical_details?: string | null
+          name?: string
+          num_people?: number
+          situation_description?: string
+          status?: string
+          updated_at?: string
+          urgency_level?: string
+          water_food_duration?: string | null
+        }
+        Relationships: []
+      }
       indian_reservoir_levels: {
         Row: {
           agency_name: string | null

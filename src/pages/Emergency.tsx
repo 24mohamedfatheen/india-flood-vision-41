@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PhoneCall, MapPin, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 // Define emergency form schema
 const formSchema = z.object({
@@ -58,23 +58,59 @@ const Emergency = () => {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     
-    // Simulate API call to emergency services
-    setTimeout(() => {
-      console.log("Emergency report submitted:", values);
-      
+    try {
+      // Insert emergency report into Supabase
+      const { data, error } = await supabase
+        .from('emergency_reports')
+        .insert([
+          {
+            name: values.name,
+            contact_number: values.contactNumber,
+            location: values.location,
+            num_people: parseInt(values.numPeople),
+            has_disabled: values.hasDisabled,
+            has_medical_needs: values.hasMedicalNeeds,
+            medical_details: values.medicalDetails,
+            has_water_food: values.hasWaterFood,
+            water_food_duration: values.waterFoodDuration,
+            situation_description: values.situationDescription,
+            urgency_level: values.urgencyLevel,
+          }
+        ])
+        .select();
+
+      if (error) {
+        console.error('Error submitting emergency report:', error);
+        toast({
+          title: "Error",
+          description: "Failed to submit emergency report. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        console.log("Emergency report submitted successfully:", data);
+        
+        toast({
+          title: "Emergency Report Sent",
+          description: "Your emergency has been reported. Help is on the way. Please stay where you are if safe.",
+          variant: "default",
+          duration: 10000,
+        });
+        
+        form.reset();
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
       toast({
-        title: "Emergency Report Sent",
-        description: "Your emergency has been reported. Help is on the way. Please stay where you are if safe.",
-        variant: "default",
-        duration: 10000,
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
       });
-      
-      form.reset();
+    } finally {
       setIsSubmitting(false);
-    }, 2000);
+    }
   }
 
   return (
