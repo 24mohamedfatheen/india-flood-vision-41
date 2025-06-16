@@ -161,6 +161,78 @@ const CACHE_VALIDITY_DURATION = 6 * 60 * 60 * 1000;
 // Local storage key for persisting cache
 const IMD_CACHE_KEY = 'imd_data_cache';
 
+// Define risk levels for specific cities based on flood risk assessment
+const cityRiskLevels: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
+  // Severe Risk cities
+  'mumbai': 'severe',
+  'kolkata': 'severe', 
+  'chennai': 'severe',
+  'guwahati': 'severe',
+  'patna': 'severe',
+  'dibrugarh': 'severe',
+  'jorhat': 'severe',
+  'kokrajhar': 'severe',
+  'balasore': 'severe',
+  'kochi': 'severe',
+  'alappuzha': 'severe',
+  'silchar': 'severe',
+  'purnia': 'severe',
+  'motihari': 'severe',
+  'muzaffarpur': 'severe',
+  'darbhanga': 'severe',
+  
+  // High Risk cities
+  'delhi': 'high',
+  'bengaluru': 'high',
+  'bangalore': 'high',
+  'hyderabad': 'high',
+  'ahmedabad': 'high',
+  'surat': 'high',
+  'pune': 'high',
+  'nagpur': 'high',
+  'bhubaneswar': 'high',
+  'cuttack': 'high',
+  'vijayawada': 'high',
+  'rajahmundry': 'high',
+  'guntur': 'high',
+  'thiruvananthapuram': 'high',
+  'thrissur': 'high',
+  'kottayam': 'high',
+  'nashik': 'high',
+  'kolhapur': 'high',
+  'vadodara': 'high',
+  'rajkot': 'high',
+  
+  // Medium Risk cities
+  'amritsar': 'medium',
+  'ludhiana': 'medium',
+  'jalandhar': 'medium',
+  'roorkee': 'medium',
+  'haridwar': 'medium',
+  'dehradun': 'medium',
+  'bihar sharif': 'medium',
+  'bhagalpur': 'medium',
+  
+  // Low Risk cities
+  'jaipur': 'low',
+  'lucknow': 'low',
+  'kanpur': 'low',
+  'indore': 'low',
+  'agra': 'low',
+  'allahabad': 'low',
+  'gorakhpur': 'low',
+  'bareilly': 'low',
+  'varanasi': 'low',
+  'gaya': 'low',
+  'shimla': 'low',
+  'srinagar': 'low'
+};
+
+// Helper function to get base risk level for a city
+const getBaseRiskLevel = (cityName: string): 'low' | 'medium' | 'high' | 'severe' => {
+  return cityRiskLevels[cityName.toLowerCase()] || 'medium';
+};
+
 // Helper function to map IMDRegionData to FloodData
 const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
   const currentYear = new Date().getFullYear();
@@ -178,11 +250,37 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
     const regionCoords = regions.find(r => r.value === item.district.toLowerCase())?.coordinates;
     const coordinates: [number, number] = regionCoords ? [regionCoords[0], regionCoords[1]] : [0, 0];
 
+    // Get base risk level for the city and potentially upgrade it based on live data
+    let finalRiskLevel = getBaseRiskLevel(item.district);
+    
+    // Upgrade risk level based on live data conditions
+    if (item.floodRiskLevel === 'severe' || 
+        item.reservoirPercentage > 90 || 
+        item.inflowCusecs > 10000) {
+      finalRiskLevel = 'severe';
+    } else if (item.floodRiskLevel === 'high' || 
+               item.reservoirPercentage > 75 || 
+               item.inflowCusecs > 5000) {
+      // Only upgrade to high if current level is not already severe
+      if (finalRiskLevel !== 'severe') {
+        finalRiskLevel = 'high';
+      }
+    } else if (item.floodRiskLevel === 'medium' || 
+               item.reservoirPercentage > 50 || 
+               item.inflowCusecs > 1000) {
+      // Only upgrade to medium if current level is low
+      if (finalRiskLevel === 'low') {
+        finalRiskLevel = 'medium';
+      }
+    }
+
+    console.log(`Mapping ${item.district}: base risk=${getBaseRiskLevel(item.district)}, live risk=${item.floodRiskLevel}, final risk=${finalRiskLevel}`);
+
     return {
       id: index + 1,
       region: item.district,
       state: item.state,
-      riskLevel: item.floodRiskLevel,
+      riskLevel: finalRiskLevel,
       affectedArea: item.affectedArea || 0,
       populationAffected: item.populationAffected || 0,
       coordinates,
@@ -210,74 +308,9 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
 
 // Create diverse static fallback data with different risk levels
 const createDiverseStaticData = (): FloodData[] => {
-  // Define risk levels for specific cities based on flood risk assessment
-  const cityRiskLevels: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
-    // High Risk cities
-    'mumbai': 'severe',
-    'kolkata': 'severe', 
-    'chennai': 'severe',
-    'guwahati': 'severe',
-    'patna': 'severe',
-    'dibrugarh': 'severe',
-    'jorhat': 'severe',
-    'kokrajhar': 'severe',
-    'balasore': 'severe',
-    'kochi': 'severe',
-    'alappuzha': 'severe',
-    'silchar': 'severe',
-    'purnia': 'severe',
-    'motihari': 'severe',
-    'muzaffarpur': 'severe',
-    'darbhanga': 'severe',
-    
-    // Medium Risk cities
-    'delhi': 'high',
-    'bengaluru': 'high',
-    'bangalore': 'high',
-    'hyderabad': 'high',
-    'ahmedabad': 'high',
-    'surat': 'high',
-    'pune': 'high',
-    'nagpur': 'high',
-    'bhubaneswar': 'high',
-    'cuttack': 'high',
-    'vijayawada': 'high',
-    'rajahmundry': 'high',
-    'guntur': 'high',
-    'thiruvananthapuram': 'high',
-    'thrissur': 'high',
-    'kottayam': 'high',
-    'nashik': 'high',
-    'kolhapur': 'high',
-    'vadodara': 'high',
-    'rajkot': 'high',
-    'amritsar': 'medium',
-    'ludhiana': 'medium',
-    'jalandhar': 'medium',
-    'roorkee': 'medium',
-    'haridwar': 'medium',
-    'dehradun': 'medium',
-    'bihar sharif': 'medium',
-    'bhagalpur': 'medium',
-    
-    // Low Risk cities
-    'jaipur': 'low',
-    'lucknow': 'low',
-    'kanpur': 'low',
-    'indore': 'low',
-    'agra': 'low',
-    'allahabad': 'low',
-    'gorakhpur': 'low',
-    'bareilly': 'low',
-    'varanasi': 'low',
-    'gaya': 'low',
-    'shimla': 'low',
-    'srinagar': 'low'
-  };
-  
   return regions.map((r, index) => {
     // Get risk level for the city, default to medium if not found
-    const riskLevel = cityRiskLevels[r.label.toLowerCase()] || 'medium';
+    const riskLevel = getBaseRiskLevel(r.label);
     
     // Set affected area and population based on risk level
     const riskMultipliers = {
