@@ -210,11 +210,74 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
 
 // Create diverse static fallback data with different risk levels
 const createDiverseStaticData = (): FloodData[] => {
-  const riskLevels: ('low' | 'medium' | 'high' | 'severe')[] = ['low', 'medium', 'high', 'severe'];
+  // Define risk levels for specific cities based on flood risk assessment
+  const cityRiskLevels: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
+    // High Risk cities
+    'mumbai': 'severe',
+    'kolkata': 'severe', 
+    'chennai': 'severe',
+    'guwahati': 'severe',
+    'patna': 'severe',
+    'dibrugarh': 'severe',
+    'jorhat': 'severe',
+    'kokrajhar': 'severe',
+    'balasore': 'severe',
+    'kochi': 'severe',
+    'alappuzha': 'severe',
+    'silchar': 'severe',
+    'purnia': 'severe',
+    'motihari': 'severe',
+    'muzaffarpur': 'severe',
+    'darbhanga': 'severe',
+    
+    // Medium Risk cities
+    'delhi': 'high',
+    'bengaluru': 'high',
+    'bangalore': 'high',
+    'hyderabad': 'high',
+    'ahmedabad': 'high',
+    'surat': 'high',
+    'pune': 'high',
+    'nagpur': 'high',
+    'bhubaneswar': 'high',
+    'cuttack': 'high',
+    'vijayawada': 'high',
+    'rajahmundry': 'high',
+    'guntur': 'high',
+    'thiruvananthapuram': 'high',
+    'thrissur': 'high',
+    'kottayam': 'high',
+    'nashik': 'high',
+    'kolhapur': 'high',
+    'vadodara': 'high',
+    'rajkot': 'high',
+    'amritsar': 'medium',
+    'ludhiana': 'medium',
+    'jalandhar': 'medium',
+    'roorkee': 'medium',
+    'haridwar': 'medium',
+    'dehradun': 'medium',
+    'bihar sharif': 'medium',
+    'bhagalpur': 'medium',
+    
+    // Low Risk cities
+    'jaipur': 'low',
+    'lucknow': 'low',
+    'kanpur': 'low',
+    'indore': 'low',
+    'agra': 'low',
+    'allahabad': 'low',
+    'gorakhpur': 'low',
+    'bareilly': 'low',
+    'varanasi': 'low',
+    'gaya': 'low',
+    'shimla': 'low',
+    'srinagar': 'low'
+  };
   
   return regions.map((r, index) => {
-    // Assign risk levels in a pattern to ensure variety
-    const riskLevel = riskLevels[index % riskLevels.length];
+    // Get risk level for the city, default to medium if not found
+    const riskLevel = cityRiskLevels[r.label.toLowerCase()] || 'medium';
     
     // Set affected area and population based on risk level
     const riskMultipliers = {

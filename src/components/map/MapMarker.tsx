@@ -18,19 +18,33 @@ const MapMarker = ({ data, map, selectedRegion, popupRef }: MapMarkerProps) => {
     
     console.log(`Marker color for ${data.region}: ${color} (risk: ${data.riskLevel})`);
     
-    // Create custom marker icon with more visible styling
+    // Create custom marker icon with proper color styling
     const customIcon = L.divIcon({
       html: `
-        <div class="flood-marker" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
-          <svg viewBox="0 0 24 24" width="28" height="28" stroke="${color}" stroke-width="2" fill="${color}" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-            <circle cx="12" cy="10" r="3" fill="white"></circle>
-          </svg>
+        <div class="flood-marker" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+          <div style="
+            width: 24px; 
+            height: 24px; 
+            background-color: ${color}; 
+            border: 3px solid white; 
+            border-radius: 50%; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <div style="
+              width: 8px; 
+              height: 8px; 
+              background-color: white; 
+              border-radius: 50%;
+            "></div>
+          </div>
         </div>
       `,
       className: data.riskLevel === 'severe' || data.riskLevel === 'high' ? 'animate-pulse' : '',
-      iconSize: [28, 28],
-      iconAnchor: [14, 28]
+      iconSize: [32, 32],
+      iconAnchor: [16, 32]
     });
     
     // Create and add marker with correct coordinates
