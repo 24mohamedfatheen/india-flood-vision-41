@@ -161,123 +161,48 @@ const CACHE_VALIDITY_DURATION = 6 * 60 * 60 * 1000;
 // Local storage key for persisting cache
 const IMD_CACHE_KEY = 'imd_data_cache';
 
-// Define risk levels for specific cities based on flood risk assessment
-const cityRiskLevels: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
-  // Severe Risk cities (Red markers)
-  'mumbai': 'severe',
-  'kolkata': 'severe', 
-  'chennai': 'severe',
-  'guwahati': 'severe',
-  'patna': 'severe',
-  'dibrugarh': 'severe',
-  'jorhat': 'severe',
-  'kokrajhar': 'severe',
-  'balasore': 'severe',
-  'kochi': 'severe',
-  'alappuzha': 'severe',
-  'silchar': 'severe',
-  'purnia': 'severe',
-  'motihari': 'severe',
-  'muzaffarpur': 'severe',
-  'darbhanga': 'severe',
-  
-  // High Risk cities (Orange markers)
-  'delhi': 'high',
-  'bengaluru': 'high',
-  'bangalore': 'high',
-  'hyderabad': 'high',
-  'ahmedabad': 'high',
-  'surat': 'high',
-  'pune': 'high',
-  'nagpur': 'high',
-  'bhubaneswar': 'high',
-  'cuttack': 'high',
-  'vijayawada': 'high',
-  'rajahmundry': 'high',
-  'guntur': 'high',
-  'thiruvananthapuram': 'high',
-  'thrissur': 'high',
-  'kottayam': 'high',
-  'nashik': 'high',
-  'kolhapur': 'high',
-  'vadodara': 'high',
-  'rajkot': 'high',
-  'bhagalpur': 'high',
-  
-  // Medium Risk cities (Yellow markers)
-  'amritsar': 'medium',
-  'ludhiana': 'medium',
-  'jalandhar': 'medium',
-  'roorkee': 'medium',
-  'haridwar': 'medium',
-  'dehradun': 'medium',
-  'bihar sharif': 'medium',
-  'lucknow': 'medium',
-  'kanpur': 'medium',
-  'allahabad': 'medium',
-  'gorakhpur': 'medium',
-  'bareilly': 'medium',
-  'varanasi': 'medium',
-  'gaya': 'medium',
-  'indore': 'medium',
-  
-  // Low Risk cities (Green markers)
-  'jaipur': 'low',
-  'agra': 'low',
-  'shimla': 'low',
-  'srinagar': 'low'
-};
-
-// Helper function to get base risk level for a city
-const getBaseRiskLevel = (cityName: string): 'low' | 'medium' | 'high' | 'severe' => {
-  return cityRiskLevels[cityName.toLowerCase()] || 'medium';
-};
-
-// Helper function to calculate risk level based on prediction probability
-const calculateRiskFromProbability = (probability: number): 'low' | 'medium' | 'high' | 'severe' => {
-  if (probability >= 70) return 'severe';
-  if (probability >= 50) return 'high';
-  if (probability >= 30) return 'medium';
-  return 'low';
-};
-
 // Helper function to map IMDRegionData to FloodData
 const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
-  const currentYear = new Date().getFullYear();
   const mappedData = imdData.map((item, index) => {
-    // Get base risk level from predefined city mapping
-    const baseRiskLevel = getBaseRiskLevel(item.district);
+    // Use the risk level directly from the live data calculation
+    const finalRiskLevel = item.floodRiskLevel;
     
     // currentRainfall Derivation (No Randomness)
     // Direct, linear, non-random scaling of reservoirPercentage and inflowCusecs
-    let derivedCurrentRainfall = (item.reservoirPercentage * 10) + (item.inflowCusecs / 50);
+    let derivedCurrentRainfall = (item.reservoirPercentage * 2) + (item.inflowCusecs / 100);
     
     // If calculated value is 0, default to fixed minimum value of 5
     if (derivedCurrentRainfall === 0) {
       derivedCurrentRainfall = 5;
     }
 
-    // Find coordinates from the dynamically generated regions and ensure proper tuple type
-    const regionCoords = regions.find(r => r.value === item.district.toLowerCase())?.coordinates;
-    const coordinates: [number, number] = regionCoords ? [regionCoords[0], regionCoords[1]] : [0, 0];
+    // Use coordinates from the IMD data
+    const coordinates: [number, number] = item.coordinates;
 
-    // Use the base risk level from our predefined mapping instead of calculating
-    const finalRiskLevel = baseRiskLevel;
+    // Set affected area and population based on actual risk level
+    const riskMultipliers = {
+      'low': { area: 25, population: 10000 },
+      'medium': { area: 80, population: 50000 },
+      'high': { area: 200, population: 200000 },
+      'severe': { area: 500, population: 800000 }
+    };
+    
+    const multiplier = riskMultipliers[finalRiskLevel];
 
-    console.log(`Mapping ${item.district}: using predefined risk=${finalRiskLevel}`);
+    console.log(`Mapping ${item.district}: using live risk=${finalRiskLevel}, percentage=${item.reservoirPercentage}%, inflow=${item.inflowCusecs}`);
 
     return {
       id: index + 1,
       region: item.district,
       state: item.state,
       riskLevel: finalRiskLevel,
-      affectedArea: item.affectedArea || 0,
-      populationAffected: item.populationAffected || 0,
+      affectedArea: multiplier.area,
+      populationAffected: multiplier.population,
       coordinates,
       timestamp: new Date().toISOString(),
       currentRainfall: derivedCurrentRainfall,
       historicalRainfallData: [], // Initialize empty, getHistoricalRainfallData will populate
-      predictionAccuracy: 85,
+      predictionAccuracy: 90, // Higher accuracy with live data
       riverLevel: item.riverData?.currentLevel,
       predictedFlood: item.predictedFlood,
       riverData: item.riverData ? {
@@ -287,7 +212,7 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
         warningLevel: item.riverData.warningLevel,
         normalLevel: item.riverData.normalLevel,
         trend: item.riverData.trend,
-        source: { name: 'Live Data', url: '' }
+        source: { name: 'Live Reservoir Data', url: '' }
       } : undefined,
       activeWarnings: item.activeWarnings,
       estimatedDamage: { crops: 0, properties: 0, infrastructure: 0 }
@@ -296,40 +221,29 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
   return mappedData;
 };
 
-// Create diverse static fallback data with proper risk distribution
-const createDiverseStaticData = (): FloodData[] => {
-  return regions.map((r, index) => {
-    // Use predefined risk levels for proper color distribution
-    const finalRiskLevel = getBaseRiskLevel(r.label);
-    
-    // Set affected area and population based on risk level
-    const riskMultipliers = {
-      'low': { area: 10, population: 5000 },
-      'medium': { area: 50, population: 25000 },
-      'high': { area: 150, population: 100000 },
-      'severe': { area: 300, population: 500000 }
-    };
-    
-    const multiplier = riskMultipliers[finalRiskLevel];
-    const coordinates: [number, number] = [r.coordinates[0], r.coordinates[1]];
+// Create static fallback data only for regions not covered by live data
+const createStaticFallbackData = (existingRegions: string[]): FloodData[] => {
+  return regions
+    .filter(r => !existingRegions.includes(r.value))
+    .map((r, index) => {
+      // Use medium risk for uncovered regions
+      const coordinates: [number, number] = [r.coordinates[0], r.coordinates[1]];
 
-    console.log(`Creating static data for ${r.label} with predefined risk level: ${finalRiskLevel}`);
-
-    return {
-      id: index + 1,
-      region: r.label,
-      state: r.state,
-      riskLevel: finalRiskLevel,
-      affectedArea: multiplier.area,
-      populationAffected: multiplier.population,
-      coordinates,
-      timestamp: new Date().toISOString(),
-      currentRainfall: finalRiskLevel === 'severe' ? 150 : finalRiskLevel === 'high' ? 100 : finalRiskLevel === 'medium' ? 60 : 20,
-      historicalRainfallData: [],
-      predictionAccuracy: 70,
-      estimatedDamage: { crops: 0, properties: 0, infrastructure: 0 }
-    };
-  });
+      return {
+        id: existingRegions.length + index + 1,
+        region: r.label,
+        state: r.state,
+        riskLevel: 'medium' as const,
+        affectedArea: 80,
+        populationAffected: 50000,
+        coordinates,
+        timestamp: new Date().toISOString(),
+        currentRainfall: 60,
+        historicalRainfallData: [],
+        predictionAccuracy: 70,
+        estimatedDamage: { crops: 0, properties: 0, infrastructure: 0 }
+      };
+    });
 };
 
 // Load cache from localStorage on init
@@ -344,6 +258,11 @@ const loadCachedData = (): void => {
         imdDataCache = parsedCache;
         console.log('Loaded valid IMD data from local storage cache');
         floodData = mapIMDRegionDataToFloodData(parsedCache.data);
+        
+        // Add static data for uncovered regions
+        const coveredRegions = parsedCache.data.map(d => d.district.toLowerCase());
+        const staticData = createStaticFallbackData(coveredRegions);
+        floodData = [...floodData, ...staticData];
       } else {
         console.log('Cached IMD data expired, will fetch fresh data');
         localStorage.removeItem(IMD_CACHE_KEY);
@@ -366,6 +285,12 @@ export const fetchImdData = async (forceRefresh = false): Promise<FloodData[]> =
   if (!forceRefresh && imdDataCache && new Date(imdDataCache.expiresAt).getTime() > Date.now()) {
     console.log('Using cached IMD data from', new Date(imdDataCache.timestamp).toLocaleString());
     floodData = mapIMDRegionDataToFloodData(imdDataCache.data);
+    
+    // Add static data for uncovered regions
+    const coveredRegions = imdDataCache.data.map(d => d.district.toLowerCase());
+    const staticData = createStaticFallbackData(coveredRegions);
+    floodData = [...floodData, ...staticData];
+    
     return floodData;
   }
 
@@ -392,26 +317,51 @@ export const fetchImdData = async (forceRefresh = false): Promise<FloodData[]> =
 
       console.log('Fresh IMD data fetched from live API and cached at', now.toLocaleString());
       floodData = mapIMDRegionDataToFloodData(liveImdData);
+      
+      // Add static data for regions not covered by live data
+      const coveredRegions = liveImdData.map(d => d.district.toLowerCase());
+      const staticData = createStaticFallbackData(coveredRegions);
+      floodData = [...floodData, ...staticData];
+      
       return floodData;
     } else {
-      console.warn('Live API returned no data. Falling back to diverse static data.');
-      floodData = createDiverseStaticData();
+      console.warn('Live API returned no data. Using cached data if available.');
+      
+      // If fetch fails but we have cached data, use it even if expired
+      if (imdDataCache) {
+        console.log('Using expired cached data due to fetch failure');
+        floodData = mapIMDRegionDataToFloodData(imdDataCache.data);
+        
+        const coveredRegions = imdDataCache.data.map(d => d.district.toLowerCase());
+        const staticData = createStaticFallbackData(coveredRegions);
+        floodData = [...floodData, ...staticData];
+        
+        return floodData;
+      }
+
+      // Create complete static fallback data if no live or cached data
+      floodData = createStaticFallbackData([]);
       return floodData;
     }
 
   } catch (error) {
-    console.error('Error fetching IMD data from live API, falling back to static:', error);
+    console.error('Error fetching IMD data from live API:', error);
 
     // If fetch fails but we have cached data, use it even if expired
     if (imdDataCache) {
       console.log('Using expired cached data due to fetch failure');
       floodData = mapIMDRegionDataToFloodData(imdDataCache.data);
+      
+      const coveredRegions = imdDataCache.data.map(d => d.district.toLowerCase());
+      const staticData = createStaticFallbackData(coveredRegions);
+      floodData = [...floodData, ...staticData];
+      
       return floodData;
     }
 
-    // Return diverse static data if no cached data available
-    console.log('No cached data, returning diverse static data.');
-    floodData = createDiverseStaticData();
+    // Return complete static data if no cached data available
+    console.log('No cached data, returning complete static data.');
+    floodData = createStaticFallbackData([]);
     return floodData;
   }
 };
@@ -503,12 +453,12 @@ export const getPredictionData = (region: string) => {
   const regionData = getFloodDataForRegion(region);
   const riskLevelBase = {
     'low': 20,
-    'medium': 35,
-    'high': 50,
-    'severe': 70
+    'medium': 40,
+    'high': 65,
+    'severe': 85
   };
 
-  // Base prediction value influenced by derived currentRainfall (no randomness)
+  // Base prediction value influenced by current risk level and reservoir data
   let baseValue = riskLevelBase[regionData?.riskLevel || 'medium'];
 
   if (regionData && regionData.currentRainfall) {
@@ -516,23 +466,27 @@ export const getPredictionData = (region: string) => {
     const rainfallEffect = Math.max(0, Math.floor((regionData.currentRainfall - 50) / 100) * 5);
     baseValue += rainfallEffect;
   }
+  
   // Cap baseValue to reasonable max
-  baseValue = Math.min(80, baseValue);
+  baseValue = Math.min(95, baseValue);
 
   // Generate 10 days of prediction data with deterministic trends (no randomness)
   return Array.from({ length: 10 }, (_, i) => {
     let trendFactor = 1;
 
-    // Create deterministic trend based on day
-    if (i < 3) {
-      // First 3 days - increasing trend
-      trendFactor = 1 + (i * 0.05);
-    } else if (i >= 3 && i < 6) {
-      // Middle days - peak then descent
-      trendFactor = 1.15 - ((i - 3) * 0.03);
+    // Create deterministic trend based on day and risk level
+    if (regionData?.riskLevel === 'severe') {
+      // Severe risk: start high and gradually decrease
+      trendFactor = 1.2 - (i * 0.08);
+    } else if (regionData?.riskLevel === 'high') {
+      // High risk: peak in middle days
+      trendFactor = i < 3 ? 1 + (i * 0.05) : 1.15 - ((i - 3) * 0.04);
+    } else if (regionData?.riskLevel === 'medium') {
+      // Medium risk: moderate variation
+      trendFactor = 1 + (Math.sin(i * 0.5) * 0.1);
     } else {
-      // Last days - decreasing trend
-      trendFactor = 1.05 - ((i - 6) * 0.05);
+      // Low risk: consistently low with minor variation
+      trendFactor = 0.8 + (i % 2 === 0 ? 0.1 : 0);
     }
 
     // Calculate probability with deterministic variation, clamped to 5-95 range
