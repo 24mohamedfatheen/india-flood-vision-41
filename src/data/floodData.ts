@@ -163,7 +163,7 @@ const IMD_CACHE_KEY = 'imd_data_cache';
 
 // Define risk levels for specific cities based on flood risk assessment
 const cityRiskLevels: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
-  // Severe Risk cities
+  // Severe Risk cities (Red markers)
   'mumbai': 'severe',
   'kolkata': 'severe', 
   'chennai': 'severe',
@@ -181,7 +181,7 @@ const cityRiskLevels: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
   'muzaffarpur': 'severe',
   'darbhanga': 'severe',
   
-  // High Risk cities
+  // High Risk cities (Orange markers)
   'delhi': 'high',
   'bengaluru': 'high',
   'bangalore': 'high',
@@ -202,8 +202,9 @@ const cityRiskLevels: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
   'kolhapur': 'high',
   'vadodara': 'high',
   'rajkot': 'high',
+  'bhagalpur': 'high',
   
-  // Medium Risk cities
+  // Medium Risk cities (Yellow markers)
   'amritsar': 'medium',
   'ludhiana': 'medium',
   'jalandhar': 'medium',
@@ -211,19 +212,18 @@ const cityRiskLevels: Record<string, 'low' | 'medium' | 'high' | 'severe'> = {
   'haridwar': 'medium',
   'dehradun': 'medium',
   'bihar sharif': 'medium',
-  'bhagalpur': 'medium',
+  'lucknow': 'medium',
+  'kanpur': 'medium',
+  'allahabad': 'medium',
+  'gorakhpur': 'medium',
+  'bareilly': 'medium',
+  'varanasi': 'medium',
+  'gaya': 'medium',
+  'indore': 'medium',
   
-  // Low Risk cities
+  // Low Risk cities (Green markers)
   'jaipur': 'low',
-  'lucknow': 'low',
-  'kanpur': 'low',
-  'indore': 'low',
   'agra': 'low',
-  'allahabad': 'low',
-  'gorakhpur': 'low',
-  'bareilly': 'low',
-  'varanasi': 'low',
-  'gaya': 'low',
   'shimla': 'low',
   'srinagar': 'low'
 };
@@ -245,6 +245,9 @@ const calculateRiskFromProbability = (probability: number): 'low' | 'medium' | '
 const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
   const currentYear = new Date().getFullYear();
   const mappedData = imdData.map((item, index) => {
+    // Get base risk level from predefined city mapping
+    const baseRiskLevel = getBaseRiskLevel(item.district);
+    
     // currentRainfall Derivation (No Randomness)
     // Direct, linear, non-random scaling of reservoirPercentage and inflowCusecs
     let derivedCurrentRainfall = (item.reservoirPercentage * 10) + (item.inflowCusecs / 50);
@@ -258,38 +261,10 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
     const regionCoords = regions.find(r => r.value === item.district.toLowerCase())?.coordinates;
     const coordinates: [number, number] = regionCoords ? [regionCoords[0], regionCoords[1]] : [0, 0];
 
-    // Calculate base prediction probability for risk assessment
-    const riskLevelBase = {
-      'low': 20,
-      'medium': 35,
-      'high': 50,
-      'severe': 70
-    };
+    // Use the base risk level from our predefined mapping instead of calculating
+    const finalRiskLevel = baseRiskLevel;
 
-    let baseValue = riskLevelBase[item.floodRiskLevel || 'medium'];
-
-    // Adjust based on reservoir conditions
-    if (item.reservoirPercentage > 90 || item.inflowCusecs > 10000) {
-      baseValue = Math.max(baseValue, 70); // Severe threshold
-    } else if (item.reservoirPercentage > 75 || item.inflowCusecs > 5000) {
-      baseValue = Math.max(baseValue, 50); // High threshold
-    } else if (item.reservoirPercentage > 50 || item.inflowCusecs > 1000) {
-      baseValue = Math.max(baseValue, 30); // Medium threshold
-    }
-
-    // Add rainfall effect
-    if (derivedCurrentRainfall > 50) {
-      const rainfallEffect = Math.floor((derivedCurrentRainfall - 50) / 100) * 5;
-      baseValue += rainfallEffect;
-    }
-
-    // Cap baseValue to reasonable max
-    baseValue = Math.min(80, baseValue);
-
-    // Calculate final risk level based on prediction probability
-    const finalRiskLevel = calculateRiskFromProbability(baseValue);
-
-    console.log(`Mapping ${item.district}: probability=${baseValue}%, risk=${finalRiskLevel}`);
+    console.log(`Mapping ${item.district}: using predefined risk=${finalRiskLevel}`);
 
     return {
       id: index + 1,
@@ -321,12 +296,11 @@ const mapIMDRegionDataToFloodData = (imdData: IMDRegionData[]): FloodData[] => {
   return mappedData;
 };
 
-// Create diverse static fallback data with aligned risk levels
+// Create diverse static fallback data with proper risk distribution
 const createDiverseStaticData = (): FloodData[] => {
   return regions.map((r, index) => {
-    // Calculate prediction probability for this region
-    const baseProbability = 25 + (index % 50); // Vary between 25-75%
-    const finalRiskLevel = calculateRiskFromProbability(baseProbability);
+    // Use predefined risk levels for proper color distribution
+    const finalRiskLevel = getBaseRiskLevel(r.label);
     
     // Set affected area and population based on risk level
     const riskMultipliers = {
@@ -339,7 +313,7 @@ const createDiverseStaticData = (): FloodData[] => {
     const multiplier = riskMultipliers[finalRiskLevel];
     const coordinates: [number, number] = [r.coordinates[0], r.coordinates[1]];
 
-    console.log(`Creating static data for ${r.label} with probability=${baseProbability}%, risk level: ${finalRiskLevel}`);
+    console.log(`Creating static data for ${r.label} with predefined risk level: ${finalRiskLevel}`);
 
     return {
       id: index + 1,

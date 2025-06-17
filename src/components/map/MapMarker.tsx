@@ -11,10 +11,10 @@ const MapMarker = ({ data, map, selectedRegion, popupRef }: MapMarkerProps) => {
 
     // Set marker color based on risk level with more distinct colors
     const color = 
-      data.riskLevel === 'severe' ? '#DC2626' :   // Red-600
-      data.riskLevel === 'high' ? '#EA580C' :     // Orange-600
-      data.riskLevel === 'medium' ? '#D97706' :   // Amber-600
-      '#059669';                                   // Emerald-600 (green)
+      data.riskLevel === 'severe' ? '#DC2626' :   // Red-600 (severe risk)
+      data.riskLevel === 'high' ? '#EA580C' :     // Orange-600 (high risk)
+      data.riskLevel === 'medium' ? '#D97706' :   // Amber-600 (medium risk)
+      '#059669';                                   // Emerald-600 (low risk - green)
     
     console.log(`Marker color for ${data.region}: ${color} (risk: ${data.riskLevel})`);
     
