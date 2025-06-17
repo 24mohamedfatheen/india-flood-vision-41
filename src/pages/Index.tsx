@@ -161,7 +161,7 @@ const Index = () => {
   }, [lastUpdateTime]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <Header />
@@ -209,27 +209,31 @@ const Index = () => {
           </div>
         </div>
         
-        {/* Region Selector */}
+        {/* Region Selector with enhanced styling */}
         <div className="mb-6">
-          <RegionSelector 
-            selectedRegion={selectedRegion}
-            onRegionChange={handleRegionChange}
-          />
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm border border-white/20">
+            <RegionSelector 
+              selectedRegion={selectedRegion}
+              onRegionChange={handleRegionChange}
+            />
+          </div>
         </div>
         
-        {/* Map */}
+        {/* Map with enhanced container */}
         <div className="mb-6">
-          <Map 
-            selectedRegion={selectedRegion} 
-            className="w-full"
-            aspectRatio={16/9}
-          />
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-2 shadow-sm border border-white/20">
+            <Map 
+              selectedRegion={selectedRegion} 
+              className="w-full rounded-lg"
+              aspectRatio={16/9}
+            />
+          </div>
         </div>
         
-        {/* Data Status and Controls */}
-        <div className="mb-6 flex items-center justify-between flex-wrap">
+        {/* Data Status and Controls with better styling */}
+        <div className="mb-6 flex items-center justify-between flex-wrap bg-white/60 backdrop-blur-sm rounded-lg p-4 shadow-sm border border-white/20">
           <div className="flex items-center mt-3 sm:mt-0 space-x-2">
-            <div className={`timestamp-badge ${dataFreshness === 'stale' ? 'bg-yellow-50 text-yellow-700' : ''}`}>
+            <div className={`timestamp-badge ${dataFreshness === 'stale' ? 'bg-yellow-50 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
               <Clock className="h-3 w-3 mr-1" />
               Last updated: {lastUpdateTime.toLocaleString()}
             </div>
@@ -244,7 +248,7 @@ const Index = () => {
               size="sm" 
               onClick={handleManualRefresh}
               disabled={dataFreshness === 'updating' || isRefreshing}
-              className="text-xs h-7"
+              className="text-xs h-7 bg-white/80"
             >
               <RefreshCw className={`h-3 w-3 mr-1 ${(dataFreshness === 'updating' || isRefreshing) ? 'animate-spin' : ''}`} />
               {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
@@ -252,9 +256,9 @@ const Index = () => {
           </div>
         </div>
         
-        {/* Warning Messages */}
+        {/* Warning Messages with enhanced styling */}
         {dataFreshness === 'stale' && (
-          <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+          <div className="mb-6 bg-yellow-50/90 backdrop-blur-sm border-l-4 border-yellow-400 p-4 rounded-lg shadow-sm">
             <div className="flex items-start">
               <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5 mr-2" />
               <div>
@@ -268,7 +272,7 @@ const Index = () => {
         )}
 
         {reservoirError && (
-          <div className="mb-6 bg-orange-50 border-l-4 border-orange-400 p-4 rounded">
+          <div className="mb-6 bg-orange-50/90 backdrop-blur-sm border-l-4 border-orange-400 p-4 rounded-lg shadow-sm">
             <div className="flex items-start">
               <AlertTriangle className="h-5 w-5 text-orange-400 mt-0.5 mr-2" />
               <div>
@@ -282,34 +286,40 @@ const Index = () => {
         )}
         
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-12">
+          <div className="flex flex-col items-center justify-center py-12 bg-white/60 backdrop-blur-sm rounded-lg">
             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
             <p className="text-lg font-medium">Loading flood data...</p>
             <p className="text-sm text-muted-foreground mt-2">Analyzing live reservoir conditions and weather data</p>
           </div>
         ) : (
           <>
-            {/* Main Content Grid */}
+            {/* Main Content Grid with enhanced backgrounds */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
               {/* Left Column - Main Data */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Current Conditions */}
-                <FloodStats floodData={enhancedFloodData} />
+                <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-white/20">
+                  <FloodStats floodData={enhancedFloodData} />
+                </div>
                 
-                {/* AI Flood Forecast - Working component */}
-                <AiFloodForecast selectedRegion={selectedRegion} />
+                {/* AI Flood Forecast */}
+                <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-white/20">
+                  <AiFloodForecast selectedRegion={selectedRegion} />
+                </div>
                 
                 {/* Prediction Card */}
-                <PredictionCard floodData={enhancedFloodData} />
+                <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-white/20">
+                  <PredictionCard floodData={enhancedFloodData} />
+                </div>
               </div>
               
               {/* Right Column - Info Panel */}
               <div className="lg:col-span-1">
-                <div className="sticky top-6 bg-white p-4 rounded-lg shadow">
+                <div className="sticky top-6 bg-white/80 backdrop-blur-sm p-4 rounded-lg shadow-sm border border-white/20">
                   <h2 className="text-lg font-medium mb-2">Flood Risk Information</h2>
                   
                   {reservoirCount > 0 && (
-                    <div className="mb-4 p-2 bg-blue-50 rounded">
+                    <div className="mb-4 p-2 bg-blue-50/80 rounded">
                       <p className="text-xs text-blue-700 font-medium">
                         ✓ Live Data Active
                       </p>
@@ -354,18 +364,22 @@ const Index = () => {
               <Button 
                 variant="outline"
                 onClick={() => setShowHistoricalData(!showHistoricalData)}
-                className="w-full"
+                className="w-full bg-white/80 backdrop-blur-sm"
               >
                 {showHistoricalData ? "Hide Historical Data" : "Show Historical Flood Data (2015-2025)"}
               </Button>
             </div>
             
-            {showHistoricalData && <HistoricalFloodData />}
+            {showHistoricalData && (
+              <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-white/20 p-4">
+                <HistoricalFloodData />
+              </div>
+            )}
           </>
         )}
         
-        {/* Footer Content */}
-        <div className="text-center text-sm rounded-lg bg-white p-4 shadow-sm mb-6">
+        {/* Footer Content with enhanced styling */}
+        <div className="text-center text-sm rounded-lg bg-white/80 backdrop-blur-sm p-4 shadow-sm mb-6 border border-white/20">
           <h3 className="font-medium mb-2">Official Data Sources</h3>
           <div className="flex flex-wrap justify-center gap-2 mb-3">
             <a href="https://mausam.imd.gov.in/" target="_blank" rel="noopener noreferrer" className="data-source-badge bg-blue-100">
@@ -389,7 +403,7 @@ const Index = () => {
           </p>
         </div>
         
-        <footer className="text-center text-sm text-muted-foreground py-4 border-t mt-6">
+        <footer className="text-center text-sm text-muted-foreground py-4 border-t mt-6 bg-white/60 backdrop-blur-sm rounded-lg">
           <p>India Flood Vision Dashboard - Data last updated: {lastUpdateTime.toLocaleString()}</p>
           <p className="text-xs mt-1">Next scheduled update: {nextUpdateTime.toLocaleString()}</p>
           <p className="text-xs mt-1">Powered by Cursor AI technology</p>

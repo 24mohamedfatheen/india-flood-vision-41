@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { SettingsIcon, Globe, Bell } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useLanguage } from '@/context/LanguageContext';
 
 const languageData = [
   { code: 'english', name: 'English', displayName: 'English', direction: 'ltr' },
@@ -23,8 +23,8 @@ const languageData = [
 
 const Settings = () => {
   const [theme, setTheme] = useState('light');
-  const [language, setLanguage] = useState('english');
   const { toast } = useToast();
+  const { language, languageData, setLanguage } = useLanguage();
   
   // Apply theme when it changes
   useEffect(() => {
@@ -40,35 +40,23 @@ const Settings = () => {
     });
   }, [theme, toast]);
   
-  // Apply language when it changes
-  useEffect(() => {
-    const selectedLang = languageData.find(lang => lang.code === language);
+  // Handle language change
+  const handleLanguageChange = (newLanguage: string) => {
+    const selectedLang = languageData.find(lang => lang.code === newLanguage);
+    setLanguage(newLanguage);
     
     if (selectedLang) {
-      document.documentElement.setAttribute('lang', language);
-      
-      // Handle RTL languages
-      document.documentElement.setAttribute('dir', selectedLang.direction);
-      
-      localStorage.setItem('language', language);
-      
       toast({
         title: "Language Changed",
         description: `Interface language changed to ${selectedLang.displayName}`,
       });
-      
-      // Reload the page to apply translations
-      // In a real app, this would use a translation system instead of reloading
-      // window.location.reload();
     }
-  }, [language, toast]);
+  };
   
-  // Initialize from localStorage on component mount
+  // Initialize theme from localStorage on component mount
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
-    const savedLanguage = localStorage.getItem('language') || 'english';
     setTheme(savedTheme);
-    setLanguage(savedLanguage);
   }, []);
 
   return (
@@ -117,7 +105,7 @@ const Settings = () => {
                     key={lang.code}
                     variant={language === lang.code ? "default" : "outline"}
                     className={`justify-start ${language === lang.code ? 'bg-blue-600' : ''} transition-all`}
-                    onClick={() => setLanguage(lang.code)}
+                    onClick={() => handleLanguageChange(lang.code)}
                   >
                     <div className="flex items-center">
                       <span className="text-lg mr-2">{lang.name}</span>
@@ -132,6 +120,9 @@ const Settings = () => {
                 <p className="text-sm text-blue-700">
                   Selecting a language will change the interface language throughout the entire application. 
                   All menus, buttons, and content will be displayed in your chosen language.
+                </p>
+                <p className="text-sm text-blue-600 mt-2 font-medium">
+                  Current Language: {languageData.find(l => l.code === language)?.displayName || 'English'}
                 </p>
               </div>
             </CardContent>

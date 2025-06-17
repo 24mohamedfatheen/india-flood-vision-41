@@ -1,7 +1,8 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPin, Navigation } from 'lucide-react';
+import { MapPin, Navigation, Loader2, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -15,14 +16,100 @@ interface LocationData {
 }
 
 interface InteractiveEvacuationMapProps {
-  userLocation: LocationData;
+  userLocation?: LocationData;
 }
 
-const InteractiveEvacuationMap: React.FC<InteractiveEvacuationMapProps> = ({ userLocation }) => {
+const InteractiveEvacuationMap: React.FC<InteractiveEvacuationMapProps> = ({ userLocation: propLocation }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<L.Map | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<LocationData | null>(propLocation || null);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  const detectLocation = () => {
+    setIsDetecting(true);
+    setLocationError(null);
+
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser");
+      setIsDetecting(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        try {
+          // Reverse geocode to get address
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            const locationData: LocationData = {
+              lat: latitude,
+              lng: longitude,
+              address: data.display_name || `${latitude}, ${longitude}`,
+              city: data.address?.city || data.address?.town || data.address?.village || 'Unknown',
+              state: data.address?.state || 'Unknown',
+              country: data.address?.country || 'Unknown'
+            };
+            setCurrentLocation(locationData);
+          } else {
+            throw new Error('Geocoding failed');
+          }
+        } catch (error) {
+          console.error('Reverse geocoding error:', error);
+          setCurrentLocation({
+            lat: latitude,
+            lng: longitude,
+            address: `${latitude}, ${longitude}`,
+            city: 'Unknown',
+            state: 'Unknown',
+            country: 'Unknown'
+          });
+        }
+        
+        setIsDetecting(false);
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        let errorMessage = "Unable to get your location. ";
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += "Location access was denied.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += "Location information is unavailable.";
+            break;
+          case error.TIMEOUT:
+            errorMessage += "Location request timed out.";
+            break;
+          default:
+            errorMessage += "An unknown error occurred.";
+            break;
+        }
+        
+        setLocationError(errorMessage);
+        setIsDetecting(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000
+      }
+    );
+  };
 
   useEffect(() => {
+    if (!currentLocation) {
+      detectLocation();
+      return;
+    }
+
     if (!mapRef.current) return;
 
     // Fix Leaflet icon issues with webpack
@@ -37,7 +124,7 @@ const InteractiveEvacuationMap: React.FC<InteractiveEvacuationMapProps> = ({ use
     leafletMapRef.current = L.map(mapRef.current, {
       attributionControl: true,
       zoomControl: true
-    }).setView([userLocation.lat, userLocation.lng], 14);
+    }).setView([currentLocation.lat, currentLocation.lng], 14);
 
     // Add OpenStreetMap tile layer
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -53,16 +140,16 @@ const InteractiveEvacuationMap: React.FC<InteractiveEvacuationMapProps> = ({ use
       iconAnchor: [11, 11]
     });
 
-    L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+    L.marker([currentLocation.lat, currentLocation.lng], { icon: userIcon })
       .addTo(leafletMapRef.current)
-      .bindPopup(`<strong>Your Location</strong><br>${userLocation.address}`)
+      .bindPopup(`<strong>Your Location</strong><br>${currentLocation.address}`)
       .openPopup();
 
     // Add shelter markers
     const shelters = generateShelterMarkers();
     shelters.forEach((shelter, index) => {
-      const shelterLat = userLocation.lat + (Math.random() - 0.5) * 0.02;
-      const shelterLng = userLocation.lng + (Math.random() - 0.5) * 0.02;
+      const shelterLat = currentLocation.lat + (Math.random() - 0.5) * 0.02;
+      const shelterLng = currentLocation.lng + (Math.random() - 0.5) * 0.02;
       
       const shelterIcon = L.divIcon({
         className: 'shelter-icon',
@@ -86,7 +173,7 @@ const InteractiveEvacuationMap: React.FC<InteractiveEvacuationMapProps> = ({ use
         leafletMapRef.current = null;
       }
     };
-  }, [userLocation]);
+  }, [currentLocation]);
 
   // Generate nearby shelter markers for display
   const generateShelterMarkers = () => {
@@ -119,6 +206,40 @@ const InteractiveEvacuationMap: React.FC<InteractiveEvacuationMapProps> = ({ use
   };
 
   const shelterMarkers = generateShelterMarkers();
+
+  if (!currentLocation && (isDetecting || locationError)) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Navigation className="h-5 w-5 mr-2" />
+            Interactive Evacuation Map
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isDetecting && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              <span>Detecting your location...</span>
+            </div>
+          )}
+          
+          {locationError && (
+            <div className="space-y-4">
+              <div className="flex items-center text-red-600">
+                <AlertTriangle className="h-5 w-5 mr-2" />
+                <span>{locationError}</span>
+              </div>
+              <Button onClick={detectLocation} className="w-full">
+                <MapPin className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -165,8 +286,18 @@ const InteractiveEvacuationMap: React.FC<InteractiveEvacuationMapProps> = ({ use
         </div>
 
         {/* Coordinates display */}
-        <div className="mt-3 text-xs text-gray-500 text-center">
-          Current Location: {userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}
+        {currentLocation && (
+          <div className="mt-3 text-xs text-gray-500 text-center">
+            Current Location: {currentLocation.lat.toFixed(6)}, {currentLocation.lng.toFixed(6)}
+          </div>
+        )}
+
+        {/* Refresh location button */}
+        <div className="mt-3 text-center">
+          <Button variant="outline" size="sm" onClick={detectLocation} disabled={isDetecting}>
+            <MapPin className="h-3 w-3 mr-1" />
+            {isDetecting ? 'Detecting...' : 'Update Location'}
+          </Button>
         </div>
       </CardContent>
     </Card>
