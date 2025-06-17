@@ -2,6 +2,8 @@
 import React, { useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapPin, Navigation } from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 interface LocationData {
   lat: number;
@@ -18,25 +20,72 @@ interface InteractiveEvacuationMapProps {
 
 const InteractiveEvacuationMap: React.FC<InteractiveEvacuationMapProps> = ({ userLocation }) => {
   const mapRef = useRef<HTMLDivElement>(null);
+  const leafletMapRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
-    if (mapRef.current) {
-      // Create an embedded Google Maps iframe with the user's location and nearby shelters
-      const mapSrc = `https://www.google.com/maps/embed/v1/place?key=AIzaSyBOti4mM-6x9WDnZIjIeyEU21OpBXqWBgw&q=${userLocation.lat},${userLocation.lng}&zoom=14&maptype=roadmap`;
+    if (!mapRef.current) return;
+
+    // Fix Leaflet icon issues with webpack
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+      iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+    });
+
+    // Create the Leaflet map
+    leafletMapRef.current = L.map(mapRef.current, {
+      attributionControl: true,
+      zoomControl: true
+    }).setView([userLocation.lat, userLocation.lng], 14);
+
+    // Add OpenStreetMap tile layer
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(leafletMapRef.current);
+
+    // Add user location marker
+    const userIcon = L.divIcon({
+      className: 'user-location-icon',
+      html: '<div style="background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+      iconSize: [22, 22],
+      iconAnchor: [11, 11]
+    });
+
+    L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+      .addTo(leafletMapRef.current)
+      .bindPopup(`<strong>Your Location</strong><br>${userLocation.address}`)
+      .openPopup();
+
+    // Add shelter markers
+    const shelters = generateShelterMarkers();
+    shelters.forEach((shelter, index) => {
+      const shelterLat = userLocation.lat + (Math.random() - 0.5) * 0.02;
+      const shelterLng = userLocation.lng + (Math.random() - 0.5) * 0.02;
       
-      mapRef.current.innerHTML = `
-        <iframe
-          width="100%"
-          height="300"
-          frameborder="0"
-          style="border:0"
-          src="${mapSrc}"
-          allowfullscreen=""
-          loading="lazy"
-          referrerpolicy="no-referrer-when-downgrade">
-        </iframe>
-      `;
-    }
+      const shelterIcon = L.divIcon({
+        className: 'shelter-icon',
+        html: `<div style="background-color: ${shelter.color.replace('bg-', '')}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      });
+
+      L.marker([shelterLat, shelterLng], { icon: shelterIcon })
+        .addTo(leafletMapRef.current!)
+        .bindPopup(`
+          <strong>${shelter.name}</strong><br>
+          Distance: ${shelter.distance}<br>
+          Direction: ${shelter.direction}
+        `);
+    });
+
+    return () => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
+    };
   }, [userLocation]);
 
   // Generate nearby shelter markers for display
@@ -85,12 +134,7 @@ const InteractiveEvacuationMap: React.FC<InteractiveEvacuationMapProps> = ({ use
       <CardContent>
         {/* Map container */}
         <div className="relative rounded-lg overflow-hidden border">
-          <div ref={mapRef} className="w-full h-72 bg-gray-100 flex items-center justify-center">
-            <div className="text-center">
-              <MapPin className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">Loading interactive map...</p>
-            </div>
-          </div>
+          <div ref={mapRef} className="w-full h-72 bg-gray-100"></div>
         </div>
 
         {/* Shelter markers legend */}
@@ -113,9 +157,9 @@ const InteractiveEvacuationMap: React.FC<InteractiveEvacuationMapProps> = ({ use
         <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
           <h4 className="font-semibold text-blue-800 mb-2">Map Features</h4>
           <div className="text-sm text-blue-700 space-y-1">
-            <p>• Your current location is marked in the center</p>
+            <p>• Your current location is marked with a blue dot</p>
             <p>• Colored markers show nearby emergency shelters</p>
-            <p>• Click on the map to get directions to any location</p>
+            <p>• Click on markers for more information</p>
             <p>• Use zoom controls to see more detail</p>
           </div>
         </div>
