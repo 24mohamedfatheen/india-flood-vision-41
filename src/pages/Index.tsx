@@ -5,16 +5,15 @@ import Header from '../components/Header';
 import RegionSelector from '../components/RegionSelector';
 import Map from '../components/Map';
 import FloodStats from '../components/FloodStats';
-import ChartSection from '../components/ChartSection';
 import PredictionCard from '../components/PredictionCard';
 import HistoricalFloodData from '../components/HistoricalFloodData';
+import AiFloodForecast from '../components/AiFloodForecast';
 import { getFloodDataForRegion, fetchImdData, floodData } from '../data/floodData';
 import { useReservoirFloodData } from '../hooks/useReservoirFloodData';
 import { useToast } from '../hooks/use-toast';
 import { Clock, RefreshCw, AlertTriangle, LogIn, LogOut, Database } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../context/AuthContext';
-import { Skeleton } from '../components/ui/skeleton';
 import CursorAiIndicator from '../components/CursorAiIndicator';
 
 const Index = () => {
@@ -164,7 +163,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <Header />
           <div className="flex items-center gap-2">
             <CursorAiIndicator />
@@ -210,13 +209,15 @@ const Index = () => {
           </div>
         </div>
         
-        {/* Region Selector first */}
-        <RegionSelector 
-          selectedRegion={selectedRegion}
-          onRegionChange={handleRegionChange}
-        />
+        {/* Region Selector */}
+        <div className="mb-6">
+          <RegionSelector 
+            selectedRegion={selectedRegion}
+            onRegionChange={handleRegionChange}
+          />
+        </div>
         
-        {/* Map now placed between region selector and timestamps/refresh controls */}
+        {/* Map */}
         <div className="mb-6">
           <Map 
             selectedRegion={selectedRegion} 
@@ -225,6 +226,7 @@ const Index = () => {
           />
         </div>
         
+        {/* Data Status and Controls */}
         <div className="mb-6 flex items-center justify-between flex-wrap">
           <div className="flex items-center mt-3 sm:mt-0 space-x-2">
             <div className={`timestamp-badge ${dataFreshness === 'stale' ? 'bg-yellow-50 text-yellow-700' : ''}`}>
@@ -250,8 +252,9 @@ const Index = () => {
           </div>
         </div>
         
+        {/* Warning Messages */}
         {dataFreshness === 'stale' && (
-          <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+          <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
             <div className="flex items-start">
               <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5 mr-2" />
               <div>
@@ -265,7 +268,7 @@ const Index = () => {
         )}
 
         {reservoirError && (
-          <div className="mb-4 bg-orange-50 border-l-4 border-orange-400 p-4 rounded">
+          <div className="mb-6 bg-orange-50 border-l-4 border-orange-400 p-4 rounded">
             <div className="flex items-start">
               <AlertTriangle className="h-5 w-5 text-orange-400 mt-0.5 mr-2" />
               <div>
@@ -286,16 +289,21 @@ const Index = () => {
           </div>
         ) : (
           <>
-            {/* Updated layout: content sections */}
+            {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              {/* Left Column - Main Data */}
               <div className="lg:col-span-2 space-y-6">
-                {/* Left side content */}
+                {/* Current Conditions */}
                 <FloodStats floodData={enhancedFloodData} />
-                <ChartSection selectedRegion={selectedRegion} />
+                
+                {/* AI Flood Forecast - Working component */}
+                <AiFloodForecast selectedRegion={selectedRegion} />
+                
+                {/* Prediction Card */}
                 <PredictionCard floodData={enhancedFloodData} />
               </div>
               
-              {/* Right side content - additional info, no map here anymore */}
+              {/* Right Column - Info Panel */}
               <div className="lg:col-span-1">
                 <div className="sticky top-6 bg-white p-4 rounded-lg shadow">
                   <h2 className="text-lg font-medium mb-2">Flood Risk Information</h2>
@@ -341,8 +349,8 @@ const Index = () => {
               </div>
             </div>
             
-            {/* Toggle button for historical flood data section */}
-            <div className="mb-4">
+            {/* Historical Data Section */}
+            <div className="mb-6">
               <Button 
                 variant="outline"
                 onClick={() => setShowHistoricalData(!showHistoricalData)}
@@ -352,11 +360,11 @@ const Index = () => {
               </Button>
             </div>
             
-            {/* Historical Flood Data Section */}
             {showHistoricalData && <HistoricalFloodData />}
           </>
         )}
         
+        {/* Footer Content */}
         <div className="text-center text-sm rounded-lg bg-white p-4 shadow-sm mb-6">
           <h3 className="font-medium mb-2">Official Data Sources</h3>
           <div className="flex flex-wrap justify-center gap-2 mb-3">
