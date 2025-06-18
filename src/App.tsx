@@ -51,7 +51,7 @@ const App = () => (
                 } />
                 <Route path="/evacuation-plan" element={<EvacuationPlan />} />
                 <Route path="/admin" element={
-                  <RequireAuth requireAdmin={true}>
+                  <RequireAuth adminOnly={true}>
                     <AdminDashboard />
                   </RequireAuth>
                 } />

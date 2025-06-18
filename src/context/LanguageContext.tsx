@@ -49,14 +49,18 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     if (selectedLang) {
       setLanguageState(newLanguage);
       
-      // Update HTML attributes
-      document.documentElement.setAttribute('lang', newLanguage);
-      document.documentElement.setAttribute('dir', selectedLang.direction);
-      
-      // Save to localStorage
-      localStorage.setItem('language', newLanguage);
-      
-      console.log(`Language changed to: ${selectedLang.displayName}`);
+      // Update HTML attributes safely
+      try {
+        document.documentElement.setAttribute('lang', newLanguage);
+        document.documentElement.setAttribute('dir', selectedLang.direction);
+        
+        // Save to localStorage
+        localStorage.setItem('language', newLanguage);
+        
+        console.log(`Language changed to: ${selectedLang.displayName}`);
+      } catch (error) {
+        console.error('Error updating language attributes:', error);
+      }
     }
   };
 
@@ -66,9 +70,13 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
 
   // Initialize from localStorage on mount
   useEffect(() => {
-    const savedLanguage = localStorage.getItem('language');
-    if (savedLanguage && languageData.find(lang => lang.code === savedLanguage)) {
-      setLanguage(savedLanguage);
+    try {
+      const savedLanguage = localStorage.getItem('language');
+      if (savedLanguage && languageData.find(lang => lang.code === savedLanguage)) {
+        setLanguage(savedLanguage);
+      }
+    } catch (error) {
+      console.error('Error loading saved language:', error);
     }
   }, []);
 
