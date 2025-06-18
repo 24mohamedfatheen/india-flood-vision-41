@@ -2,6 +2,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { 
   NavigationMenu,
   NavigationMenuContent,
@@ -26,6 +27,7 @@ import { Button } from './ui/button';
 
 const Navigation = () => {
   const { logout, user, userType } = useAuth();
+  const { translate } = useLanguage();
   const location = useLocation();
   
   return (
@@ -36,14 +38,14 @@ const Navigation = () => {
             <NavigationMenuItem>
               <Link to="/" className={navigationMenuTriggerStyle()}>
                 <Eye className="mr-2 h-4 w-4" />
-                Flood Vision
+                {translate('flood-vision')}
               </Link>
             </NavigationMenuItem>
             
             <NavigationMenuItem>
               <NavigationMenuTrigger>
                 <Shield className="mr-2 h-4 w-4" />
-                Safety Tips
+                {translate('safety-tips')}
               </NavigationMenuTrigger>
               <NavigationMenuContent>
                 <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
@@ -103,28 +105,28 @@ const Navigation = () => {
             <NavigationMenuItem>
               <Link to="/emergency" className={cn(navigationMenuTriggerStyle(), "text-red-600")}>
                 <PhoneCall className="mr-2 h-4 w-4" />
-                Emergency
+                {translate('emergency')}
               </Link>
             </NavigationMenuItem>
             
             <NavigationMenuItem>
               <Link to="/about" className={navigationMenuTriggerStyle()}>
                 <Info className="mr-2 h-4 w-4" />
-                About Us
+                {translate('about-us')}
               </Link>
             </NavigationMenuItem>
             
             <NavigationMenuItem>
               <Link to="/contact" className={navigationMenuTriggerStyle()}>
                 <Mail className="mr-2 h-4 w-4" />
-                Contact Us
+                {translate('contact-us')}
               </Link>
             </NavigationMenuItem>
 
             <NavigationMenuItem>
               <Link to="/settings" className={navigationMenuTriggerStyle()}>
                 <Settings className="mr-2 h-4 w-4" />
-                Settings
+                {translate('settings')}
               </Link>
             </NavigationMenuItem>
           </NavigationMenuList>
@@ -134,22 +136,22 @@ const Navigation = () => {
           <div className="flex items-center">
             <User className="h-4 w-4 mr-1" />
             <span className="text-sm font-medium">
-              {user?.username}
+              {translate('welcome')}, {user?.username}
               {user?.userType === 'admin' && (
-                <span className="ml-1 text-xs bg-red-100 text-red-600 px-1 py-0.5 rounded">Admin</span>
+                <span className="ml-1 text-xs bg-red-100 text-red-600 px-1 py-0.5 rounded">{translate('admin')}</span>
               )}
             </span>
           </div>
           
           {userType === 'admin' && (
             <Button variant="outline" size="sm" asChild>
-              <Link to="/admin">Admin Panel</Link>
+              <Link to="/admin">{translate('admin')} Panel</Link>
             </Button>
           )}
           
           <Button variant="ghost" size="sm" onClick={logout}>
             <LogOut className="h-4 w-4 mr-1" />
-            Logout
+            {translate('logout')}
           </Button>
         </div>
       </div>

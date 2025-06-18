@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { translations } from '../utils/translations';
 
 interface LanguageData {
   code: string;
@@ -24,6 +25,7 @@ interface LanguageContextType {
   languageData: LanguageData[];
   setLanguage: (language: string) => void;
   getCurrentLanguage: () => LanguageData;
+  translate: (key: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -43,29 +45,51 @@ interface LanguageProviderProps {
 export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) => {
   const [language, setLanguageState] = useState<string>('english');
 
+  const translate = (key: string): string => {
+    try {
+      const translation = translations[language]?.[key];
+      return translation || translations['english']?.[key] || key;
+    } catch (error) {
+      console.error('Translation error:', error);
+      return key;
+    }
+  };
+
   const setLanguage = (newLanguage: string) => {
-    const selectedLang = languageData.find(lang => lang.code === newLanguage);
-    
-    if (selectedLang) {
-      setLanguageState(newLanguage);
+    try {
+      const selectedLang = languageData.find(lang => lang.code === newLanguage);
       
-      // Update HTML attributes safely
-      try {
-        document.documentElement.setAttribute('lang', newLanguage);
-        document.documentElement.setAttribute('dir', selectedLang.direction);
+      if (selectedLang) {
+        setLanguageState(newLanguage);
         
-        // Save to localStorage
-        localStorage.setItem('language', newLanguage);
-        
-        console.log(`Language changed to: ${selectedLang.displayName}`);
-      } catch (error) {
-        console.error('Error updating language attributes:', error);
+        // Update HTML attributes safely
+        if (typeof document !== 'undefined') {
+          document.documentElement.setAttribute('lang', newLanguage);
+          document.documentElement.setAttribute('dir', selectedLang.direction);
+          
+          // Save to localStorage
+          localStorage.setItem('language', newLanguage);
+          
+          console.log(`Language changed to: ${selectedLang.displayName}`);
+          
+          // Force a re-render by dispatching a custom event
+          window.dispatchEvent(new CustomEvent('languageChanged', { 
+            detail: { language: newLanguage, displayName: selectedLang.displayName } 
+          }));
+        }
       }
+    } catch (error) {
+      console.error('Error setting language:', error);
     }
   };
 
   const getCurrentLanguage = () => {
-    return languageData.find(lang => lang.code === language) || languageData[0];
+    try {
+      return languageData.find(lang => lang.code === language) || languageData[0];
+    } catch (error) {
+      console.error('Error getting current language:', error);
+      return languageData[0];
+    }
   };
 
   // Initialize from localStorage on mount
@@ -73,7 +97,12 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     try {
       const savedLanguage = localStorage.getItem('language');
       if (savedLanguage && languageData.find(lang => lang.code === savedLanguage)) {
-        setLanguage(savedLanguage);
+        setLanguageState(savedLanguage);
+        const selectedLang = languageData.find(lang => lang.code === savedLanguage);
+        if (selectedLang && typeof document !== 'undefined') {
+          document.documentElement.setAttribute('lang', savedLanguage);
+          document.documentElement.setAttribute('dir', selectedLang.direction);
+        }
       }
     } catch (error) {
       console.error('Error loading saved language:', error);
@@ -84,7 +113,8 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     language,
     languageData,
     setLanguage,
-    getCurrentLanguage
+    getCurrentLanguage,
+    translate
   };
 
   return (
