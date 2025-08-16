@@ -8,6 +8,7 @@ import FloodStats from '../components/FloodStats';
 import PredictionCard from '../components/PredictionCard';
 import HistoricalFloodData from '../components/HistoricalFloodData';
 import AiFloodForecast from '../components/AiFloodForecast';
+import RainfallChart from '../components/RainfallChart';
 import { getFloodDataForRegion, fetchImdData, floodData } from '../data/floodData';
 import { useReservoirFloodData } from '../hooks/useReservoirFloodData';
 import { useToast } from '../hooks/use-toast';
@@ -305,6 +306,11 @@ const Index = () => {
                 {/* AI Flood Forecast */}
                 <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-white/20">
                   <AiFloodForecast selectedRegion={selectedRegion} />
+                </div>
+                
+                {/* Rainfall Chart */}
+                <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-white/20">
+                  <RainfallChart selectedRegion={selectedRegion} />
                 </div>
                 
                 {/* Prediction Card */}

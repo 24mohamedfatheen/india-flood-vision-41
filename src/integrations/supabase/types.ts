@@ -149,6 +149,51 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_rainfall_data: {
+        Row: {
+          avg_daily_rainfall_mm: number | null
+          created_at: string | null
+          district: string | null
+          id: string
+          location: string
+          max_daily_rainfall_mm: number | null
+          month: number
+          rainy_days_count: number | null
+          state: string | null
+          total_rainfall_mm: number
+          updated_at: string | null
+          year: number
+        }
+        Insert: {
+          avg_daily_rainfall_mm?: number | null
+          created_at?: string | null
+          district?: string | null
+          id?: string
+          location: string
+          max_daily_rainfall_mm?: number | null
+          month: number
+          rainy_days_count?: number | null
+          state?: string | null
+          total_rainfall_mm: number
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          avg_daily_rainfall_mm?: number | null
+          created_at?: string | null
+          district?: string | null
+          id?: string
+          location?: string
+          max_daily_rainfall_mm?: number | null
+          month?: number
+          rainy_days_count?: number | null
+          state?: string | null
+          total_rainfall_mm?: number
+          updated_at?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
       my_test_table: {
         Row: {
           id: number
