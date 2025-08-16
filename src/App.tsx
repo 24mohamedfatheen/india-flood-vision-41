@@ -36,27 +36,67 @@ const App = () => (
             <div className="min-h-screen bg-background">
               <Navigation />
               <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/safety-tips" element={<SafetyTips />} />
-                <Route path="/safety-before-flood" element={<SafetyBeforeFlood />} />
-                <Route path="/safety-during-flood" element={<SafetyDuringFlood />} />
-                <Route path="/safety-after-flood" element={<SafetyAfterFlood />} />
-                <Route path="/emergency" element={<Emergency />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/" element={
+                  <RequireAuth>
+                    <Index />
+                  </RequireAuth>
+                } />
+                <Route path="/about" element={
+                  <RequireAuth>
+                    <About />
+                  </RequireAuth>
+                } />
+                <Route path="/contact" element={
+                  <RequireAuth>
+                    <Contact />
+                  </RequireAuth>
+                } />
+                <Route path="/safety-tips" element={
+                  <RequireAuth>
+                    <SafetyTips />
+                  </RequireAuth>
+                } />
+                <Route path="/safety-before-flood" element={
+                  <RequireAuth>
+                    <SafetyBeforeFlood />
+                  </RequireAuth>
+                } />
+                <Route path="/safety-during-flood" element={
+                  <RequireAuth>
+                    <SafetyDuringFlood />
+                  </RequireAuth>
+                } />
+                <Route path="/safety-after-flood" element={
+                  <RequireAuth>
+                    <SafetyAfterFlood />
+                  </RequireAuth>
+                } />
+                <Route path="/emergency" element={
+                  <RequireAuth>
+                    <Emergency />
+                  </RequireAuth>
+                } />
                 <Route path="/emergency-reports" element={
                   <RequireAuth>
                     <EmergencyReports />
                   </RequireAuth>
                 } />
-                <Route path="/evacuation-plan" element={<EvacuationPlan />} />
+                <Route path="/evacuation-plan" element={
+                  <RequireAuth>
+                    <EvacuationPlan />
+                  </RequireAuth>
+                } />
                 <Route path="/admin" element={
                   <RequireAuth adminOnly={true}>
                     <AdminDashboard />
                   </RequireAuth>
                 } />
-                <Route path="/login" element={<Login />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings" element={
+                  <RequireAuth>
+                    <Settings />
+                  </RequireAuth>
+                } />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </div>
