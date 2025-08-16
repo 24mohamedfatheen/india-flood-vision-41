@@ -34,68 +34,103 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <div className="min-h-screen bg-background">
-              <Navigation />
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/" element={
-                  <RequireAuth>
-                    <Index />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth>
+                      <Index />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="/about" element={
-                  <RequireAuth>
-                    <About />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth>
+                      <About />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="/contact" element={
-                  <RequireAuth>
-                    <Contact />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth>
+                      <Contact />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="/safety-tips" element={
-                  <RequireAuth>
-                    <SafetyTips />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth>
+                      <SafetyTips />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="/safety-before-flood" element={
-                  <RequireAuth>
-                    <SafetyBeforeFlood />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth>
+                      <SafetyBeforeFlood />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="/safety-during-flood" element={
-                  <RequireAuth>
-                    <SafetyDuringFlood />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth>
+                      <SafetyDuringFlood />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="/safety-after-flood" element={
-                  <RequireAuth>
-                    <SafetyAfterFlood />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth>
+                      <SafetyAfterFlood />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="/emergency" element={
-                  <RequireAuth>
-                    <Emergency />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth>
+                      <Emergency />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="/emergency-reports" element={
-                  <RequireAuth>
-                    <EmergencyReports />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth>
+                      <EmergencyReports />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="/evacuation-plan" element={
-                  <RequireAuth>
-                    <EvacuationPlan />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth>
+                      <EvacuationPlan />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="/admin" element={
-                  <RequireAuth adminOnly={true}>
-                    <AdminDashboard />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth adminOnly={true}>
+                      <AdminDashboard />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="/settings" element={
-                  <RequireAuth>
-                    <Settings />
-                  </RequireAuth>
+                  <>
+                    <Navigation />
+                    <RequireAuth>
+                      <Settings />
+                    </RequireAuth>
+                  </>
                 } />
                 <Route path="*" element={<NotFound />} />
               </Routes>
