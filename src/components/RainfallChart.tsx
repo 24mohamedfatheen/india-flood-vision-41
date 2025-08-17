@@ -6,33 +6,34 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CloudRain, Calendar } from 'lucide-react';
 
-interface RainfallData {
-  id: string;
-  location: string;
+interface ReservoirData {
+  id: number;
+  reservoir_name: string;
   state: string;
   district: string;
   year: number;
-  month: number;
-  total_rainfall_mm: number;
-  avg_daily_rainfall_mm: number;
-  max_daily_rainfall_mm: number;
-  rainy_days_count: number;
+  month: string;
+  current_level_mcm: number;
+  capacity_mcm: number;
+  percentage_full: number;
+  inflow_cusecs: number;
+  outflow_cusecs: number;
 }
 
 interface ChartData {
   month: string;
-  rainfall: number;
-  avgDaily: number;
-  maxDaily: number;
+  reservoirLevel: number;
+  inflow: number;
+  outflow: number;
 }
 
-interface RainfallChartProps {
+interface ReservoirChartProps {
   selectedRegion: string;
 }
 
-const RainfallChart: React.FC<RainfallChartProps> = ({ selectedRegion }) => {
+const RainfallChart: React.FC<ReservoirChartProps> = ({ selectedRegion }) => {
   const [selectedYear, setSelectedYear] = useState<string>('2024');
-  const [rainfallData, setRainfallData] = useState<ChartData[]>([]);
+  const [reservoirData, setReservoirData] = useState<ChartData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -43,49 +44,88 @@ const RainfallChart: React.FC<RainfallChartProps> = ({ selectedRegion }) => {
 
   const years = ['2020', '2021', '2022', '2023', '2024', '2025'];
 
+  // Map regions to their states for filtering reservoir data
+  const getStateForRegion = (region: string): string => {
+    const regionStateMap: Record<string, string> = {
+      'mumbai': 'Maharashtra',
+      'delhi': 'Delhi',
+      'kolkata': 'West Bengal',
+      'chennai': 'Tamil Nadu',
+      'bangalore': 'Karnataka',
+      'hyderabad': 'Telangana',
+      'ahmedabad': 'Gujarat',
+      'pune': 'Maharashtra',
+      'surat': 'Gujarat',
+      'jaipur': 'Rajasthan',
+      'lucknow': 'Uttar Pradesh',
+      'kanpur': 'Uttar Pradesh',
+      'nagpur': 'Maharashtra',
+      'patna': 'Bihar',
+      'indore': 'Madhya Pradesh',
+      'kochi': 'Kerala',
+      'guwahati': 'Assam'
+    };
+    return regionStateMap[region.toLowerCase()] || '';
+  };
+
   useEffect(() => {
-    fetchRainfallData();
+    fetchReservoirData();
   }, [selectedRegion, selectedYear]);
 
-  const fetchRainfallData = async () => {
+  const fetchReservoirData = async () => {
     setIsLoading(true);
     try {
+      const stateForRegion = getStateForRegion(selectedRegion);
+      
       const { data, error } = await supabase
-        .from('monthly_rainfall_data')
+        .from('indian_reservoir_levels')
         .select('*')
-        .eq('location', selectedRegion)
+        .eq('state', stateForRegion)
         .eq('year', parseInt(selectedYear))
         .order('month', { ascending: true });
 
       if (error) {
-        console.error('Error fetching rainfall data:', error);
+        console.error('Error fetching reservoir data:', error);
         toast({
           title: "Error",
-          description: "Failed to fetch rainfall data.",
+          description: "Failed to fetch reservoir data.",
           variant: "destructive",
         });
         return;
       }
 
-      // Transform data for chart
+      // Transform data for chart - aggregate by month
       const chartData: ChartData[] = monthNames.map((monthName, index) => {
         const monthNum = index + 1;
-        const monthData = data?.find((item: RainfallData) => item.month === monthNum);
+        const monthData = data?.filter((item: ReservoirData) => {
+          const itemMonth = typeof item.month === 'string' ? 
+            monthNames.indexOf(item.month.substring(0, 3)) + 1 : 
+            parseInt(item.month);
+          return itemMonth === monthNum;
+        });
+        
+        // Calculate averages for the month
+        const avgLevel = monthData && monthData.length > 0 ? 
+          monthData.reduce((sum, item) => sum + (item.percentage_full || 0), 0) / monthData.length : 0;
+        const avgInflow = monthData && monthData.length > 0 ? 
+          monthData.reduce((sum, item) => sum + (item.inflow_cusecs || 0), 0) / monthData.length : 0;
+        const avgOutflow = monthData && monthData.length > 0 ? 
+          monthData.reduce((sum, item) => sum + (item.outflow_cusecs || 0), 0) / monthData.length : 0;
         
         return {
           month: monthName,
-          rainfall: monthData?.total_rainfall_mm || 0,
-          avgDaily: monthData?.avg_daily_rainfall_mm || 0,
-          maxDaily: monthData?.max_daily_rainfall_mm || 0,
+          reservoirLevel: avgLevel,
+          inflow: avgInflow,
+          outflow: avgOutflow,
         };
       });
 
-      setRainfallData(chartData);
+      setReservoirData(chartData);
     } catch (error) {
       console.error('Unexpected error:', error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred while fetching rainfall data.",
+        description: "An unexpected error occurred while fetching reservoir data.",
         variant: "destructive",
       });
     } finally {
@@ -99,13 +139,13 @@ const RainfallChart: React.FC<RainfallChartProps> = ({ selectedRegion }) => {
         <div className="bg-white p-3 border rounded-lg shadow-lg">
           <p className="font-medium">{`${label} ${selectedYear}`}</p>
           <p className="text-blue-600">
-            {`Total Rainfall: ${payload[0]?.value?.toFixed(1)} mm`}
+            {`Reservoir Level: ${payload[0]?.value?.toFixed(1)}%`}
           </p>
           <p className="text-green-600">
-            {`Avg Daily: ${payload[1]?.value?.toFixed(1)} mm`}
+            {`Inflow: ${payload[1]?.value?.toFixed(0)} cusecs`}
           </p>
           <p className="text-orange-600">
-            {`Max Daily: ${payload[2]?.value?.toFixed(1)} mm`}
+            {`Outflow: ${payload[2]?.value?.toFixed(0)} cusecs`}
           </p>
         </div>
       );
@@ -119,7 +159,7 @@ const RainfallChart: React.FC<RainfallChartProps> = ({ selectedRegion }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <CloudRain className="h-5 w-5 text-blue-600" />
-            <CardTitle>Monthly Rainfall Patterns</CardTitle>
+            <CardTitle>Monthly Reservoir Patterns</CardTitle>
           </div>
           <div className="flex items-center space-x-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -148,7 +188,7 @@ const RainfallChart: React.FC<RainfallChartProps> = ({ selectedRegion }) => {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={rainfallData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <LineChart data={reservoirData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis 
                 dataKey="month" 
@@ -158,44 +198,44 @@ const RainfallChart: React.FC<RainfallChartProps> = ({ selectedRegion }) => {
               <YAxis 
                 stroke="#666"
                 fontSize={12}
-                label={{ value: 'Rainfall (mm)', angle: -90, position: 'insideLeft' }}
+                label={{ value: 'Reservoir Level (%)', angle: -90, position: 'insideLeft' }}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend />
               <Line 
                 type="monotone" 
-                dataKey="rainfall" 
+                dataKey="reservoirLevel" 
                 stroke="#2563eb" 
                 strokeWidth={3}
                 dot={{ fill: '#2563eb', strokeWidth: 2, r: 5 }}
-                name="Total Monthly Rainfall"
+                name="Reservoir Level (%)"
               />
               <Line 
                 type="monotone" 
-                dataKey="avgDaily" 
+                dataKey="inflow" 
                 stroke="#16a34a" 
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 dot={{ fill: '#16a34a', strokeWidth: 2, r: 4 }}
-                name="Average Daily Rainfall"
+                name="Inflow (cusecs)"
               />
               <Line 
                 type="monotone" 
-                dataKey="maxDaily" 
+                dataKey="outflow" 
                 stroke="#ea580c" 
                 strokeWidth={2}
                 strokeDasharray="2 2"
                 dot={{ fill: '#ea580c', strokeWidth: 2, r: 4 }}
-                name="Maximum Daily Rainfall"
+                name="Outflow (cusecs)"
               />
             </LineChart>
           </ResponsiveContainer>
         )}
         
-        {!isLoading && rainfallData.every(item => item.rainfall === 0) && (
+        {!isLoading && reservoirData.every(item => item.reservoirLevel === 0) && (
           <div className="text-center py-8 text-muted-foreground">
             <CloudRain className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No rainfall data available for {selectedRegion} in {selectedYear}</p>
+            <p>No reservoir data available for {selectedRegion} in {selectedYear}</p>
             <p className="text-sm mt-2">Try selecting a different year or region</p>
           </div>
         )}
