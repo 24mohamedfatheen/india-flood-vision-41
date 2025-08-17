@@ -75,12 +75,36 @@ const RainfallChart: React.FC<ReservoirChartProps> = ({ selectedRegion }) => {
   const fetchReservoirData = async () => {
     setIsLoading(true);
     try {
-      const stateForRegion = getStateForRegion(selectedRegion);
+      // Get reservoir names relevant to the region
+      const getReservoirNamesForRegion = (region: string): string[] => {
+        const regionReservoirMap: Record<string, string[]> = {
+          'mumbai': ['Tansa', 'Vihar', 'Tulsi', 'Vaitarna', 'Bhatsa'],
+          'delhi': ['Yamuna', 'Bhakra'],
+          'kolkata': ['Damodar', 'Farakka'],
+          'chennai': ['Poondi', 'Cholavaram', 'Redhills', 'Chembarambakkam'],
+          'bangalore': ['Cauvery', 'Kabini', 'Krishna Raja'],
+          'hyderabad': ['Nagarjuna', 'Srisailam'],
+          'ahmedabad': ['Sardar Sarovar', 'Ukai'],
+          'pune': ['Khadakwasla', 'Panshet', 'Warasgaon'],
+          'surat': ['Ukai', 'Kadana'],
+          'jaipur': ['Bisalpur', 'Mahi Bajaj'],
+          'lucknow': ['Rihand', 'Obra'],
+          'kanpur': ['Rihand', 'Mata Tila'],
+          'nagpur': ['Gosikhurd', 'Totladoh'],
+          'patna': ['Sone', 'Kosi'],
+          'indore': ['Omkareshwar', 'Bargi'],
+          'kochi': ['Idukki', 'Mullaperiyar'],
+          'guwahati': ['Kopili', 'Umiam']
+        };
+        return regionReservoirMap[region.toLowerCase()] || [];
+      };
+
+      const relevantReservoirNames = getReservoirNamesForRegion(selectedRegion);
       
+      // Fetch data and filter by reservoir names and year
       const { data, error } = await supabase
         .from('indian_reservoir_levels')
         .select('*')
-        .eq('state', stateForRegion)
         .eq('year', parseInt(selectedYear))
         .order('month', { ascending: true });
 
@@ -94,23 +118,36 @@ const RainfallChart: React.FC<ReservoirChartProps> = ({ selectedRegion }) => {
         return;
       }
 
+      // Filter data by reservoir names relevant to the region
+      const filteredData = data?.filter((item: any) => 
+        relevantReservoirNames.some(name => 
+          item.reservoir_name?.toLowerCase().includes(name.toLowerCase())
+        )
+      ) || [];
+
       // Transform data for chart - aggregate by month
       const chartData: ChartData[] = monthNames.map((monthName, index) => {
-        const monthNum = index + 1;
-        const monthData = data?.filter((item: ReservoirData) => {
-          const itemMonth = typeof item.month === 'string' ? 
-            monthNames.indexOf(item.month.substring(0, 3)) + 1 : 
-            parseInt(item.month);
-          return itemMonth === monthNum;
+        const monthNum = (index + 1).toString();
+        const monthData = filteredData.filter((item: any) => {
+          return item.month === monthNum || item.month === monthName.toLowerCase();
         });
         
-        // Calculate averages for the month
-        const avgLevel = monthData && monthData.length > 0 ? 
-          monthData.reduce((sum, item) => sum + (item.percentage_full || 0), 0) / monthData.length : 0;
-        const avgInflow = monthData && monthData.length > 0 ? 
-          monthData.reduce((sum, item) => sum + (item.inflow_cusecs || 0), 0) / monthData.length : 0;
-        const avgOutflow = monthData && monthData.length > 0 ? 
-          monthData.reduce((sum, item) => sum + (item.outflow_cusecs || 0), 0) / monthData.length : 0;
+        // Calculate averages for the month with actual data
+        const validLevelData = monthData.filter(item => item.level != null && item.full_reservoir_level != null);
+        const validInflowData = monthData.filter(item => item.inflow_cusecs != null);
+        const validOutflowData = monthData.filter(item => item.outflow_cusecs != null);
+        
+        const avgLevel = validLevelData.length > 0 ? 
+          validLevelData.reduce((sum, item) => {
+            const percentage = (item.level / item.full_reservoir_level) * 100;
+            return sum + (percentage || 0);
+          }, 0) / validLevelData.length : 0;
+          
+        const avgInflow = validInflowData.length > 0 ? 
+          validInflowData.reduce((sum, item) => sum + (item.inflow_cusecs || 0), 0) / validInflowData.length : 0;
+          
+        const avgOutflow = validOutflowData.length > 0 ? 
+          validOutflowData.reduce((sum, item) => sum + (item.outflow_cusecs || 0), 0) / validOutflowData.length : 0;
         
         return {
           month: monthName,
