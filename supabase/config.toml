@@ -1,1 +1,4 @@
 project_id = "tovkiryixtyyxojmxwes"
+
+[functions.flood-bot-chat]
+verify_jwt = false

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { Bot, Send, MessageSquare, X, Minimize2, Maximize2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { supabase } from '../integrations/supabase/client';
 
 interface Message {
   id: string;
@@ -36,262 +37,49 @@ const FloodBot: React.FC<FloodBotProps> = ({ selectedRegion = 'mumbai' }) => {
   }, [messages]);
 
   const generateBotResponse = async (userMessage: string): Promise<string> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
+    try {
+      console.log('Calling flood-bot-chat edge function...');
+      
+      const { data, error } = await supabase.functions.invoke('flood-bot-chat', {
+        body: { 
+          message: userMessage,
+          selectedRegion: selectedRegion 
+        }
+      });
 
-    const lowerMessage = userMessage.toLowerCase();
-    
-    // Flood-related knowledge base
-    if (lowerMessage.includes('flood warning') || lowerMessage.includes('alert')) {
-      return `🚨 **Flood Warning Information for ${selectedRegion}:**
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
 
-**Current Alert Levels:**
-• **Yellow Alert**: Heavy rainfall expected (50-100mm in 24hrs)
-• **Orange Alert**: Very heavy rainfall (100-200mm in 24hrs) 
-• **Red Alert**: Extremely heavy rainfall (>200mm in 24hrs)
+      return data.response || 'I apologize, but I am unable to process your request at the moment. Please try again or contact local emergency services for immediate flood-related concerns.';
+      
+    } catch (error) {
+      console.error('Error calling flood bot service:', error);
+      
+      // Provide a helpful fallback response
+      return `🚨 **Flood Bot Temporarily Unavailable**
 
-**What to do during warnings:**
-1. Stay updated with official weather forecasts
-2. Avoid low-lying areas and waterlogged roads
-3. Keep emergency supplies ready
-4. Follow evacuation orders if issued
+I'm experiencing technical difficulties, but here are essential emergency contacts:
 
-For real-time alerts, monitor IMD weather updates and local disaster management authorities.`;
-    }
-
-    if (lowerMessage.includes('evacuation') || lowerMessage.includes('evacuate')) {
-      return `🏃‍♂️ **Evacuation Guidelines:**
-
-**When to evacuate:**
-• Official evacuation order issued
-• Water level rising rapidly near your area
-• Structural damage to your building
-• Loss of utilities (power, water, communication)
-
-**Evacuation checklist:**
-✅ Important documents (ID, insurance, medical records)
-✅ Emergency supplies (water, food, medicines)
-✅ Phone chargers and cash
-✅ Change of clothes and blankets
-
-**Safe evacuation routes:**
-• Use designated evacuation routes
-• Avoid flooded roads and bridges  
-• Move to higher ground immediately
-• Follow traffic authorities' directions
-
-Contact local emergency services: 📞 **108** for immediate assistance.`;
-    }
-
-    if (lowerMessage.includes('safety') || lowerMessage.includes('precaution')) {
-      return `🛡️ **Flood Safety Measures:**
-
-**Before floods:**
-• Create an emergency plan with your family
-• Prepare emergency kit (72-hour supplies)
-• Know your evacuation routes
-• Install sump pumps and waterproofing
-• Keep sandbags and plastic sheets ready
-
-**During floods:**
-• Never walk through moving water
-• Avoid electrical equipment if wet
-• Stay away from storm drains and sewers
-• Don't drive through flooded roads
-• Stay indoors and on higher floors
-
-**After floods:**
-• Wait for authorities to declare area safe
-• Check for structural damage before entering
-• Boil water before drinking
-• Dispose of contaminated food
-• Watch for electrical hazards
-
-Remember: **6 inches of moving water can knock you down, 12 inches can carry away a vehicle.**`;
-    }
-
-    if (lowerMessage.includes('emergency') || lowerMessage.includes('help') || lowerMessage.includes('contact')) {
-      return `🚨 **Emergency Contacts & Services:**
-
-**National Emergency Numbers:**
-• **108** - Emergency Services (Ambulance, Fire, Police)
+**Emergency Services:**
+• **108** - Emergency Services (Ambulance, Fire, Police)  
 • **101** - Fire Department
 • **100** - Police Emergency
-• **102** - Women Helpline
 
-**Disaster Management:**
-• **NDMA**: 1078 (National Disaster Management)
-• **State Emergency**: Contact your state control room
+**Immediate Flood Safety:**
+• Move to higher ground immediately
+• Avoid walking or driving through floodwater
+• Stay informed through official weather updates
+• Contact local emergency services if in immediate danger
 
-**Regional Emergency Services for ${selectedRegion}:**
-• Local Control Room: Check district collector's office
-• Municipal Corporation Emergency Line
-• Regional Meteorological Office
+**For ${selectedRegion}:**
+• Monitor local news and emergency broadcasts
+• Follow evacuation orders from authorities
+• Keep emergency supplies ready
 
-**What information to provide:**
-1. Your exact location and landmarks
-2. Number of people affected
-3. Type of emergency (flooding, medical, rescue)
-4. Immediate danger or injuries
-5. Contact number for follow-up
-
-**Online reporting:** Use official disaster management apps or websites for non-critical updates.`;
+Please try again in a moment or contact local authorities directly for urgent flood information.`;
     }
-
-    if (lowerMessage.includes('preparation') || lowerMessage.includes('prepare') || lowerMessage.includes('kit')) {
-      return `📋 **Flood Preparation Checklist:**
-
-**Emergency Supply Kit:**
-🥤 Water: 1 gallon per person per day (3-day supply)
-🍞 Food: 3-day supply of non-perishable food
-🔦 Flashlight and extra batteries
-📻 Battery-powered or hand crank radio
-🏥 First aid kit and medications
-🧻 Sanitation and personal hygiene items
-💰 Cash and credit cards
-📄 Important family documents (copies)
-🔥 Fire extinguisher, matches in waterproof container
-
-**Home preparation:**
-• Clear gutters and storm drains
-• Trim trees near your home
-• Secure outdoor furniture and decorations
-• Install sump pump and backup power
-• Waterproof basement walls
-• Raise utilities above potential flood levels
-
-**Vehicle preparation:**
-• Keep fuel tank full
-• Check emergency kit in car
-• Know alternate routes to safety`;
-    }
-
-    if (lowerMessage.includes('water level') || lowerMessage.includes('river') || lowerMessage.includes('dam')) {
-      return `🌊 **Water Level Information for ${selectedRegion}:**
-
-**Current Monitoring:**
-• River levels are monitored by Central Water Commission (CWC)
-• Dam water levels tracked by state irrigation departments
-• Real-time data available on official portals
-
-**Critical levels:**
-• **Normal**: Below warning level
-• **Warning**: First alert level - increased monitoring
-• **Danger**: Evacuation preparations begin
-• **Extreme**: Immediate evacuation required
-
-**Key water bodies to monitor:**
-${selectedRegion === 'mumbai' ? '• Mithi River, Powai Lake, Vihar Lake' : 
-  selectedRegion === 'chennai' ? '• Adyar River, Cooum River, Chembarambakkam Lake' :
-  selectedRegion === 'kolkata' ? '• Hooghly River, Salt Lake' :
-  '• Local rivers and reservoirs in your area'}
-
-**Stay updated:**
-📱 Download official apps: IMD Weather, NDMA, State Emergency apps
-🌐 Visit: cwc.gov.in for real-time river data
-📺 Follow local news and official social media accounts`;
-    }
-
-    if (lowerMessage.includes('insurance') || lowerMessage.includes('claim') || lowerMessage.includes('compensation')) {
-      return `💰 **Flood Insurance & Compensation:**
-
-**Insurance coverage:**
-• **Home insurance**: Check if flood damage is covered
-• **Vehicle insurance**: Comprehensive covers flood damage
-• **Crop insurance**: For agricultural losses
-
-**Documentation for claims:**
-📸 Photos/videos of damage (before cleanup)
-📋 List of damaged items with approximate values  
-🧾 Bills and receipts of damaged property
-📄 Police report (if required)
-🏥 Medical bills (for flood-related injuries)
-
-**Government compensation:**
-• Relief funds available through District Collector
-• Compensation for crop losses
-• House repair grants for BPL families
-• Livelihood restoration support
-
-**Steps to file claims:**
-1. Report damage immediately to insurance company
-2. File FIR if required
-3. Keep all documentation safe and dry
-4. Don't dispose damaged items until assessment
-5. Register for government relief at local camps
-
-**Helpline:** Contact your insurance company immediately after flood damage occurs.`;
-    }
-
-    if (lowerMessage.includes('health') || lowerMessage.includes('disease') || lowerMessage.includes('medical')) {
-      return `🏥 **Flood-Related Health Concerns:**
-
-**Common health risks:**
-🦠 **Water-borne diseases**: Cholera, typhoid, hepatitis A
-🐛 **Vector-borne**: Malaria, dengue (increased mosquito breeding)
-👂 **Skin/ear infections**: From contaminated water contact
-🤧 **Respiratory issues**: From mold and dampness
-
-**Prevention measures:**
-💧 **Water safety**: Only drink boiled/bottled water
-🍎 **Food safety**: Avoid street food, eat hot cooked meals
-🧼 **Hygiene**: Wash hands frequently with soap
-🩹 **Wound care**: Clean and cover any cuts immediately
-😷 **Protection**: Use masks in moldy areas
-
-**When to seek medical help:**
-• Fever, diarrhea, vomiting
-• Skin rashes or persistent wounds
-• Difficulty breathing
-• Signs of dehydration
-• Any injury from flood debris
-
-**Medical preparedness:**
-✅ Stock essential medicines (7-day supply)
-✅ Keep first aid kit updated
-✅ Know location of nearest medical facility
-✅ Have emergency medical contacts ready
-
-**Post-flood cleanup:** Wear protective gear (gloves, boots, masks) when cleaning flood-damaged areas.`;
-    }
-
-    // Default response for general flood questions
-    return `🌊 **Flood Information Assistant**
-
-I can help you with information about:
-
-🚨 **Emergency & Safety**
-• Flood warnings and alerts
-• Emergency contacts and procedures
-• Evacuation guidelines
-
-🛡️ **Preparation & Prevention**
-• Emergency supply kits
-• Home preparation measures
-• Safety precautions
-
-📊 **Monitoring & Data**
-• Water levels and river status
-• Weather forecasting
-• Real-time flood updates
-
-🏥 **Health & Recovery**
-• Health risks and prevention
-• Post-flood safety measures
-• Medical emergency procedures
-
-💰 **Support & Claims**
-• Insurance information
-• Government compensation
-• Relief procedures
-
-Please ask me specific questions about any of these topics, and I'll provide detailed, organized information to help keep you safe and informed about flood situations in ${selectedRegion}.
-
-**Example questions:**
-• "How do I prepare for floods?"
-• "What are the emergency contact numbers?"
-• "How do I file flood insurance claims?"
-• "What health precautions should I take?"`;
   };
 
   const handleSendMessage = async () => {
