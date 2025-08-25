@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
@@ -8,6 +7,7 @@ import FloodStats from '../components/FloodStats';
 import PredictionCard from '../components/PredictionCard';
 import HistoricalFloodData from '../components/HistoricalFloodData';
 import AiFloodForecast from '../components/AiFloodForecast';
+import FloodBot from '../components/FloodBot';
 import { getFloodDataForRegion, fetchImdData, floodData } from '../data/floodData';
 import { useReservoirFloodData } from '../hooks/useReservoirFloodData';
 import { useToast } from '../hooks/use-toast';
@@ -409,6 +409,9 @@ const Index = () => {
           <p className="text-xs mt-1">Powered by Cursor AI technology</p>
         </footer>
       </div>
+      
+      {/* Flood Bot Chatbot */}
+      <FloodBot selectedRegion={selectedRegion} />
     </div>
   );
 };
