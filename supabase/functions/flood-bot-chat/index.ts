@@ -19,10 +19,10 @@ serve(async (req) => {
       throw new Error('Message is required');
     }
 
-    const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     
-    if (!PERPLEXITY_API_KEY) {
-      throw new Error('PERPLEXITY_API_KEY is not configured');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY is not configured');
     }
 
     const systemPrompt = `You are FloodBot, an expert flood information assistant specializing in flood safety, preparedness, and real-time information. Your primary region is ${selectedRegion}, but you can provide information for any location.
@@ -45,47 +45,37 @@ RESPONSE FORMAT:
 
 Focus on being helpful, accurate, and potentially life-saving in emergency situations.`;
 
-    console.log('Calling Perplexity API for flood information...');
+    console.log('Calling Gemini API for flood information...');
     
-    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.1-sonar-large-128k-online',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: `Flood-related question about ${selectedRegion}: ${message}`
-          }
-        ],
-        temperature: 0.2,
-        top_p: 0.9,
-        max_tokens: 1500,
-        return_images: false,
-        return_related_questions: false,
-        search_recency_filter: 'month',
-        frequency_penalty: 1,
-        presence_penalty: 0
+        contents: [{
+          parts: [{
+            text: `${systemPrompt}\n\nUser question about ${selectedRegion}: ${message}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.2,
+          topP: 0.9,
+          maxOutputTokens: 1500,
+        }
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Perplexity API error:', response.status, errorText);
-      throw new Error(`Perplexity API error: ${response.status}`);
+      console.error('Gemini API error:', response.status, errorText);
+      throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('Perplexity API response received');
+    console.log('Gemini API response received');
     
-    const botResponse = data.choices[0]?.message?.content || 'I apologize, but I am unable to process your request at the moment. Please try again or contact local emergency services for immediate flood-related concerns.';
+    const botResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 'I apologize, but I am unable to process your request at the moment. Please try again or contact local emergency services for immediate flood-related concerns.';
 
     return new Response(JSON.stringify({ response: botResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
