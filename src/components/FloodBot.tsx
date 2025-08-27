@@ -147,10 +147,14 @@ Please try again in a moment or contact local authorities directly for urgent fl
       <div className="fixed bottom-6 right-6 z-50">
         <Button
           onClick={() => setIsOpen(true)}
-          className="rounded-full w-14 h-14 shadow-lg bg-blue-600 hover:bg-blue-700"
+          className="rounded-full w-14 h-14 shadow-lg bg-blue-600 hover:bg-blue-700 p-0"
           size="lg"
         >
-          <Bot className="h-6 w-6" />
+          <img 
+            src="/lovable-uploads/4944e071-8681-4b9b-9cb2-5f02c9b66639.png" 
+            alt="FloodBot"
+            className="h-8 w-8 object-contain"
+          />
         </Button>
       </div>
     );
@@ -162,7 +166,11 @@ Please try again in a moment or contact local authorities directly for urgent fl
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Bot className="h-5 w-5 text-blue-600" />
+              <img 
+                src="/lovable-uploads/4944e071-8681-4b9b-9cb2-5f02c9b66639.png" 
+                alt="FloodBot"
+                className="h-5 w-5 object-contain"
+              />
               Flood Bot
               <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">Online</span>
             </CardTitle>
