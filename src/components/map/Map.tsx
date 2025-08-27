@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { floodData, getFloodDataForRegion } from '../../data/floodData';
+import { fetchNearbyReservoirsFromSupabase, fetchHistoricalRainfallFromSupabase } from '../../services/supabaseFloodDataService';
 import { useToast } from '../../hooks/use-toast';
 import MapControls from './MapControls';
 import MapMarker from './MapMarker';
@@ -19,8 +20,40 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
   const layersRef = useRef<{[key: string]: L.Layer}>({});
   const [mapLoaded, setMapLoaded] = useState<boolean>(false);
   const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [reservoirData, setReservoirData] = useState<any[]>([]);
+  const [rainfallData, setRainfallData] = useState<any[]>([]);
   const selectedFloodData = getFloodDataForRegion(selectedRegion);
   const { toast } = useToast();
+
+  // Fetch real data from Supabase
+  useEffect(() => {
+    const fetchMapData = async () => {
+      try {
+        const coordinates = selectedFloodData?.coordinates;
+        const [reservoirs, rainfall] = await Promise.all([
+          fetchNearbyReservoirsFromSupabase(selectedRegion, coordinates),
+          fetchHistoricalRainfallFromSupabase(selectedRegion, 5)
+        ]);
+        
+        setReservoirData(reservoirs);
+        setRainfallData(rainfall);
+        setLastUpdate(new Date().toISOString());
+        
+        console.log(`Map updated with ${reservoirs.length} reservoirs and ${rainfall.length} rainfall records for ${selectedRegion}`);
+      } catch (error) {
+        console.error('Error fetching map data:', error);
+        toast({
+          title: "Data Update Warning",
+          description: "Using cached data. Some information may not be current.",
+          variant: "default"
+        });
+      }
+    };
+
+    if (selectedRegion) {
+      fetchMapData();
+    }
+  }, [selectedRegion, selectedFloodData, toast]);
 
   // Initialize map
   useEffect(() => {
@@ -73,7 +106,7 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
     }
   }, [toast]);
 
-  // Update map when selected region changes
+  // Update map when selected region changes or when reservoir data loads
   useEffect(() => {
     if (!mapLoaded || !map.current || !selectedFloodData) return;
 
@@ -90,9 +123,9 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
     // Add state boundary highlighting
     updateStateBoundary();
 
-  }, [selectedRegion, mapLoaded, selectedFloodData]);
+  }, [selectedRegion, mapLoaded, selectedFloodData, reservoirData]); // Added reservoirData dependency
 
-  // Update flood areas on map
+  // Update flood areas on map with real Supabase data
   const updateFloodAreas = () => {
     if (!map.current || !layersRef.current['floodAreas']) return;
     
@@ -100,7 +133,42 @@ const MapComponent: React.FC<MapProps> = ({ selectedRegion }) => {
     const floodAreasLayer = layersRef.current['floodAreas'] as L.LayerGroup;
     floodAreasLayer.clearLayers();
     
-    // Generate flood area features
+    // Add reservoir markers from real data
+    reservoirData.forEach(reservoir => {
+      if (reservoir.lat && reservoir.long) {
+        const riskLevel = reservoir.percentage_full > 85 ? 'severe' : 
+                         reservoir.percentage_full > 70 ? 'high' : 'medium';
+        
+        const color = 
+          riskLevel === 'severe' ? '#F44336' :
+          riskLevel === 'high' ? '#FF9800' : '#FFC107';
+        
+        // Create reservoir circle
+        const reservoirCircle = L.circle([reservoir.lat, reservoir.long], {
+          radius: 5000, // 5km radius
+          color: color,
+          weight: 2,
+          opacity: 0.8,
+          fillColor: color,
+          fillOpacity: 0.4
+        });
+        
+        // Add popup with real reservoir data
+        reservoirCircle.bindPopup(`
+          <div class="font-bold">${reservoir.reservoir_name}</div>
+          <div>District: ${reservoir.district || 'N/A'}, ${reservoir.state || 'N/A'}</div>
+          <div>Current Level: ${reservoir.percentage_full?.toFixed(1) || 'N/A'}% full</div>
+          <div>Capacity: ${reservoir.capacity_mcm?.toFixed(1) || 'N/A'} MCM</div>
+          <div>Inflow: ${reservoir.inflow_cusecs || 'N/A'} cusecs</div>
+          <div>Outflow: ${reservoir.outflow_cusecs || 'N/A'} cusecs</div>
+          <div class="text-xs mt-1">Updated: ${reservoir.last_updated ? new Date(reservoir.last_updated).toLocaleDateString() : 'Unknown'}</div>
+        `);
+        
+        reservoirCircle.addTo(floodAreasLayer);
+      }
+    });
+    
+    // Generate flood area features (keep existing logic for other regions)
     const filteredFloodData = floodData.filter(data => data.riskLevel !== 'low');
     
     filteredFloodData.forEach(data => {

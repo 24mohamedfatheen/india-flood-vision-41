@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getHistoricalRainfallData, fetchImdData, FloodData } from '../data/floodData'; // Import fetchImdData and FloodData
+import { fetchHistoricalRainfallFromSupabase } from '../services/supabaseFloodDataService';
 import { Button } from './ui/button'; // Assuming Button is used
 import { format, isValid, parseISO } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -25,17 +26,37 @@ const ChartSection: React.FC<ChartSectionProps> = ({ selectedRegion }) => {
       setLoading(true);
       setError(null);
       try {
-        // This will now attempt live fetch and fallback to static
-        await fetchImdData(true); // Force refresh to ensure data is updated
-        // getHistoricalRainfallData now directly retrieves from the global floodData
-        const processedData = getHistoricalRainfallData(selectedRegion, selectedYear); // Pass selectedYear
-        setHistoricalData(processedData);
+        // Fetch real data from Supabase first
+        const supabaseData = await fetchHistoricalRainfallFromSupabase(selectedRegion, 12);
+        
+        if (supabaseData && supabaseData.length > 0) {
+          // Process Supabase data for the chart
+          const monthlyData = Array.from({ length: 12 }, (_, i) => {
+            const monthName = new Date(0, i).toLocaleDateString('en', { month: 'long' });
+            const monthData = supabaseData.filter(item => item.month === i + 1 && item.year === selectedYear);
+            const totalRainfall = monthData.reduce((sum, item) => sum + item.total_rainfall_mm, 0);
+            
+            return {
+              month: monthName,
+              rainfall: totalRainfall || 0
+            };
+          });
+          
+          setHistoricalData(monthlyData);
+          console.log(`Chart updated with Supabase data: ${supabaseData.length} records for ${selectedRegion}`);
+        } else {
+          // Fallback to static data if no Supabase data
+          await fetchImdData(true); // Force refresh to ensure data is updated
+          const processedData = getHistoricalRainfallData(selectedRegion, selectedYear);
+          setHistoricalData(processedData);
+          console.log(`Chart using fallback static data for ${selectedRegion}`);
+        }
       } catch (err) {
         console.error("Failed to load historical data:", err);
-        setError("Failed to load historical data. Please try again later.");
-        // If fetchImdData fails, it already handles fallback to static internally.
-        // So, we can just call getHistoricalRainfallData again to get the fallback data.
-        setHistoricalData(getHistoricalRainfallData(selectedRegion, selectedYear)); // Pass selectedYear
+        setError("Failed to load historical data. Using fallback data.");
+        // Final fallback to static data
+        const processedData = getHistoricalRainfallData(selectedRegion, selectedYear);
+        setHistoricalData(processedData);
       } finally {
         setLoading(false);
       }
@@ -110,6 +131,7 @@ const ChartSection: React.FC<ChartSectionProps> = ({ selectedRegion }) => {
             <h2 className="section-title">Historical Rainfall Data</h2>
             <p className="text-sm text-muted-foreground">
               {selectedRegion.charAt(0).toUpperCase() + selectedRegion.slice(1)} rainfall data for {selectedYear}
+              {historicalData.length > 0 && ` • ${historicalData.filter(d => d.rainfall > 0).length} months with data`}
             </p>
           </div>
           <div className="flex items-center space-x-2 mt-2 md:mt-0">
