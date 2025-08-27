@@ -148,27 +148,29 @@ function calculateFloodProbability(
   
   // Calculate total probability with weighted factors
   let probability = (
-    baseRainfallFactor * 0.35 +    // 35% weight to current rainfall prediction
-    reservoirFactor * 0.30 +       // 30% weight to reservoir conditions
-    groundSaturationFactor * 0.15 + // 15% weight to ground saturation
-    historicalPatternFactor * 0.15 + // 15% weight to historical patterns
-    seasonalFactor * 0.05          // 5% weight to seasonal factors
+    Math.min(baseRainfallFactor, 40) * 0.35 +    // Cap rainfall factor at 40
+    Math.min(reservoirFactor, 35) * 0.30 +       // Cap reservoir factor at 35
+    Math.min(groundSaturationFactor, 25) * 0.15 + // Cap ground saturation at 25
+    Math.min(historicalPatternFactor, 20) * 0.15 + // Cap historical pattern at 20
+    Math.min(seasonalFactor, 15) * 0.05          // Cap seasonal factor at 15
   );
   
-  // Apply seasonal coefficient
-  probability *= seasonalCoefficient;
+  // Apply seasonal coefficient but cap it to prevent extreme values
+  probability *= Math.min(seasonalCoefficient, 1.5);
   
-  // Forecast uncertainty increases over time
-  const uncertaintyFactor = 1 + (dayIndex * 0.08);
+  // Add some natural variation based on day index (decreasing over time)
+  const baseVariation = 5 + Math.random() * 10; // Random 5-15% base variation
+  const timeDecay = Math.max(0.3, 1 - (dayIndex * 0.1)); // Decrease probability over time
   
-  // Add trend-based variation (more realistic than pure randomness)
-  const trendFactor = Math.sin(dayIndex * 0.3) * (10 - dayIndex);
+  // Apply time-based decay and variation
+  probability = (probability + baseVariation) * timeDecay;
   
-  // Apply uncertainty and trend
-  probability = probability * uncertaintyFactor + trendFactor;
+  // Add realistic day-to-day fluctuation
+  const dailyVariation = (Math.random() - 0.5) * 8; // ±4% daily variation
+  probability += dailyVariation;
   
-  // Ensure probability stays within realistic bounds
-  probability = Math.min(98, Math.max(2, probability));
+  // Ensure probability stays within realistic bounds (2-85% max)
+  probability = Math.min(85, Math.max(2, probability));
   
   // Confidence decreases with forecast distance and data quality
   let confidence = 95 - (dayIndex * 6);
